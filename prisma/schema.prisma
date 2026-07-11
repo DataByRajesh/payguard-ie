@@ -1,0 +1,232 @@
+// PayGuard IE — Prisma schema
+// See prisma.config.ts for datasource URL / migration path configuration.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REVERSED
+}
+
+enum SettlementStatus {
+  PENDING
+  SETTLED
+  FAILED
+  REVERSED
+}
+
+enum ExceptionType {
+  AMOUNT_MISMATCH
+  CURRENCY_MISMATCH
+  DUPLICATE_PAYMENT
+  MISSING_SETTLEMENT
+  DELAYED_SETTLEMENT
+  SLA_BREACH
+}
+
+enum ExceptionSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ExceptionStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum UATStatus {
+  NOT_RUN
+  PASSED
+  FAILED
+  BLOCKED
+}
+
+enum EvidenceType {
+  SCREENSHOT
+  LOG_EXTRACT
+  QUERY_RESULT
+  SIGN_OFF_DOCUMENT
+  OTHER
+}
+
+model Customer {
+  id          String   @id @default(cuid())
+  customerRef String   @unique
+  displayName String
+  country     String
+  createdAt   DateTime @default(now())
+
+  payments Payment[]
+}
+
+model Payment {
+  id                   String        @id @default(cuid())
+  paymentReference     String        @unique
+  customerId           String
+  customer             Customer      @relation(fields: [customerId], references: [id])
+  amountMinor           Int
+  currency              String
+  paymentMethod         String
+  status                PaymentStatus
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  expectedSettlementAt  DateTime
+
+  settlement            Settlement?
+  exceptionCases        ExceptionCase[]
+  reconciliationResults ReconciliationResult[]
+
+  @@index([status])
+  @@index([customerId])
+}
+
+model Settlement {
+  id                   String           @id @default(cuid())
+  settlementReference  String           @unique
+  paymentId            String           @unique
+  payment               Payment          @relation(fields: [paymentId], references: [id])
+  amountMinor           Int
+  currency              String
+  status                SettlementStatus
+  settledAt             DateTime?
+  sourceFileReference   String
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  reconciliationResults ReconciliationResult[]
+}
+
+model ReconciliationRun {
+  id             String   @id @default(cuid())
+  runReference   String   @unique
+  runAt          DateTime @default(now())
+  totalPayments  Int
+  matchedCount   Int
+  exceptionCount Int
+
+  results ReconciliationResult[]
+}
+
+model ReconciliationResult {
+  id                  String            @id @default(cuid())
+  reconciliationRunId String
+  reconciliationRun   ReconciliationRun @relation(fields: [reconciliationRunId], references: [id])
+  paymentId           String
+  payment             Payment           @relation(fields: [paymentId], references: [id])
+  settlementId        String?
+  settlement          Settlement?       @relation(fields: [settlementId], references: [id])
+  outcome             String
+  notes               String?
+  createdAt           DateTime          @default(now())
+
+  @@index([paymentId])
+}
+
+model ExceptionCase {
+  id            String            @id @default(cuid())
+  caseReference String            @unique
+  paymentId     String
+  payment       Payment           @relation(fields: [paymentId], references: [id])
+  type          ExceptionType
+  severity      ExceptionSeverity
+  status        ExceptionStatus
+  title         String
+  description   String
+  assignedTo    String?
+  openedAt      DateTime          @default(now())
+  resolvedAt    DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  comments        ExceptionComment[]
+  evidenceRecords EvidenceRecord[]
+}
+
+model ExceptionComment {
+  id              String        @id @default(cuid())
+  exceptionCaseId String
+  exceptionCase   ExceptionCase @relation(fields: [exceptionCaseId], references: [id])
+  author          String
+  body            String
+  createdAt       DateTime      @default(now())
+}
+
+model AuditEvent {
+  id         String   @id @default(cuid())
+  entityType String
+  entityId   String
+  action     String
+  summary    String
+  actor      String
+  metadata   String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+}
+
+model UATTestCase {
+  id             String   @id @default(cuid())
+  testCaseRef    String   @unique
+  title          String
+  description    String
+  preconditions  String?
+  steps          String
+  expectedResult String
+  area           String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  executions UATExecution[]
+}
+
+model UATExecution {
+  id            String      @id @default(cuid())
+  uatTestCaseId String
+  uatTestCase   UATTestCase @relation(fields: [uatTestCaseId], references: [id])
+  status        UATStatus
+  executedAt    DateTime?
+  executedBy    String?
+  actualResult  String?
+  notes         String?
+  createdAt     DateTime    @default(now())
+
+  evidenceRecords EvidenceRecord[]
+}
+
+model EvidenceRecord {
+  id            String       @id @default(cuid())
+  evidenceRef   String       @unique
+  type          EvidenceType
+  title         String
+  description   String?
+  fileReference String?
+  capturedAt    DateTime     @default(now())
+  createdAt     DateTime     @default(now())
+
+  uatExecutionId  String?
+  uatExecution    UATExecution?  @relation(fields: [uatExecutionId], references: [id])
+  exceptionCaseId String?
+  exceptionCase   ExceptionCase? @relation(fields: [exceptionCaseId], references: [id])
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  role      String
+  createdAt DateTime @default(now())
+}
