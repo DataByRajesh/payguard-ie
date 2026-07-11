@@ -42,12 +42,51 @@ enum ExceptionSeverity {
   CRITICAL
 }
 
+/// Sprint 3 lifecycle. Supersedes the Sprint 1/2 OPEN/IN_PROGRESS values.
 enum ExceptionStatus {
   NEW
-  OPEN
-  IN_PROGRESS
+  ASSIGNED
+  INVESTIGATING
+  AWAITING_INFORMATION
   RESOLVED
   CLOSED
+}
+
+enum ExceptionNoteType {
+  INVESTIGATION
+  CUSTOMER_UPDATE
+  TECHNICAL_FINDING
+  HANDOVER
+  RESOLUTION_NOTE
+}
+
+enum RootCauseCategory {
+  PROCESSING_CONFIGURATION
+  SETTLEMENT_FILE_MISSING
+  UPSTREAM_PROVIDER_DELAY
+  DUPLICATE_SUBMISSION
+  DATA_MAPPING_ERROR
+  CURRENCY_CONFIGURATION
+  STATUS_SYNCHRONISATION
+  MANUAL_PROCESSING_ERROR
+  UNKNOWN
+  OTHER
+}
+
+enum ResolutionAction {
+  CORRECTIVE_SETTLEMENT_APPLIED
+  PAYMENT_STATUS_CORRECTED
+  DUPLICATE_TRANSACTION_CANCELLED
+  CONFIGURATION_CORRECTED
+  UPSTREAM_PROVIDER_CONFIRMED
+  ACCEPTED_OPERATIONAL_EXCEPTION
+  NO_ISSUE_FOUND
+  OTHER
+}
+
+enum ApprovalDecision {
+  APPROVED
+  REJECTED
 }
 
 enum ReconciliationRunStatus {
@@ -66,10 +105,11 @@ enum ReconciliationRuleType {
   INVALID_STATUS_COMBINATION
 }
 
+/// PASS/FAIL (not PASSED/FAILED) per the Sprint 3 spec's exact vocabulary.
 enum UATStatus {
   NOT_RUN
-  PASSED
-  FAILED
+  PASS
+  FAIL
   BLOCKED
 }
 
@@ -173,39 +213,73 @@ model ReconciliationResult {
 }
 
 model ExceptionCase {
-  id             String            @id @default(cuid())
-  caseReference  String            @unique
-  paymentId      String
-  payment        Payment           @relation(fields: [paymentId], references: [id])
-  type           ExceptionType
-  severity       ExceptionSeverity
-  status         ExceptionStatus
-  title          String
-  description    String
-  assignedTo     String?
+  id            String            @id @default(cuid())
+  caseReference String            @unique
+  paymentId     String
+  payment       Payment           @relation(fields: [paymentId], references: [id])
+  type          ExceptionType
+  severity      ExceptionSeverity
+  status        ExceptionStatus
+  title         String
+  description   String
+
+  assignedUserId   String?
+  assignedUser     User?     @relation("ExceptionAssignedUser", fields: [assignedUserId], references: [id])
+  assignedAt       DateTime?
+  assignedByUserId String?
+  assignedByUser   User?     @relation("ExceptionAssignedByUser", fields: [assignedByUserId], references: [id])
+  assignmentNote   String?
+
+  rootCauseCategory         RootCauseCategory?
+  rootCauseSummary          String?
+  rootCauseIdentifiedById   String?
+  rootCauseIdentifiedByUser User?              @relation("ExceptionRootCauseUser", fields: [rootCauseIdentifiedById], references: [id])
+  rootCauseIdentifiedAt     DateTime?
+
+  resolutionAction  ResolutionAction?
+  resolutionSummary String?
+  resolutionUserId  String?
+  resolutionUser    User?             @relation("ExceptionResolutionUser", fields: [resolutionUserId], references: [id])
+  resolutionAt      DateTime?
+
+  approvalDecision ApprovalDecision?
+  approvalNote     String?
+  approverUserId   String?
+  approverUser     User?             @relation("ExceptionApproverUser", fields: [approverUserId], references: [id])
+  approvalAt       DateTime?
+
   dedupeKey      String
-  lastDetectedAt DateTime          @default(now())
+  lastDetectedAt DateTime  @default(now())
   slaDeadline    DateTime?
-  source         String            @default("MANUAL")
-  openedAt       DateTime          @default(now())
+  source         String    @default("MANUAL")
+  openedAt       DateTime  @default(now())
   resolvedAt     DateTime?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  closedAt       DateTime?
+  /// Optimistic-concurrency guard: every mutation must supply the version it read and increment it.
+  version        Int       @default(1)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   comments              ExceptionComment[]
   evidenceRecords       EvidenceRecord[]
   reconciliationResults ReconciliationResult[]
+  uatExecutions         UATExecution[]         @relation("UatLinkedException")
 
   @@index([dedupeKey])
+  @@index([status])
+  @@index([assignedUserId])
 }
 
+/// Append-only investigation notes (renamed in spirit from "comments" to typed notes in Sprint 3).
 model ExceptionComment {
-  id              String        @id @default(cuid())
+  id              String            @id @default(cuid())
   exceptionCaseId String
-  exceptionCase   ExceptionCase @relation(fields: [exceptionCaseId], references: [id])
-  author          String
+  exceptionCase   ExceptionCase     @relation(fields: [exceptionCaseId], references: [id])
+  noteType        ExceptionNoteType @default(INVESTIGATION)
+  authorUserId    String
+  authorUser      User              @relation("ExceptionNoteAuthor", fields: [authorUserId], references: [id])
   body            String
-  createdAt       DateTime      @default(now())
+  createdAt       DateTime          @default(now())
 }
 
 model AuditEvent {
@@ -222,16 +296,17 @@ model AuditEvent {
 }
 
 model UATTestCase {
-  id             String   @id @default(cuid())
-  testCaseRef    String   @unique
-  title          String
-  description    String
-  preconditions  String?
-  steps          String
-  expectedResult String
-  area           String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  testCaseRef          String   @unique
+  title                String
+  description          String
+  requirementReference String?
+  preconditions        String?
+  steps                String
+  expectedResult       String
+  area                 String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   executions UATExecution[]
 }
@@ -242,10 +317,14 @@ model UATExecution {
   uatTestCase   UATTestCase @relation(fields: [uatTestCaseId], references: [id])
   status        UATStatus
   executedAt    DateTime?
-  executedBy    String?
+  testerUserId  String?
+  testerUser    User?       @relation("UatTester", fields: [testerUserId], references: [id])
   actualResult  String?
   notes         String?
   createdAt     DateTime    @default(now())
+
+  linkedExceptionCaseId String?
+  linkedExceptionCase   ExceptionCase? @relation("UatLinkedException", fields: [linkedExceptionCaseId], references: [id])
 
   evidenceRecords EvidenceRecord[]
 }
@@ -257,6 +336,8 @@ model EvidenceRecord {
   title         String
   description   String?
   fileReference String?
+  addedByUserId String?
+  addedByUser   User?        @relation("EvidenceAddedByUser", fields: [addedByUserId], references: [id])
   capturedAt    DateTime     @default(now())
   createdAt     DateTime     @default(now())
 
@@ -271,5 +352,15 @@ model User {
   email     String   @unique
   name      String
   role      String
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
+
+  assignedExceptions   ExceptionCase[]    @relation("ExceptionAssignedUser")
+  assignedByExceptions ExceptionCase[]    @relation("ExceptionAssignedByUser")
+  rootCauseExceptions  ExceptionCase[]    @relation("ExceptionRootCauseUser")
+  resolvedExceptions   ExceptionCase[]    @relation("ExceptionResolutionUser")
+  approvedExceptions   ExceptionCase[]    @relation("ExceptionApproverUser")
+  exceptionNotes       ExceptionComment[] @relation("ExceptionNoteAuthor")
+  evidenceAdded        EvidenceRecord[]   @relation("EvidenceAddedByUser")
+  uatExecutionsAsTester UATExecution[]    @relation("UatTester")
 }
