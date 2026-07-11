@@ -4,6 +4,7 @@ import { RECONCILIATION_CONFIG } from "./config";
 import type { PaymentInput, RuleEvaluation, RuleType, Severity, SettlementInput } from "./types";
 import type { ReconciliationRunSummary } from "./summary";
 import type { ExceptionType } from "@/app/generated/prisma/enums";
+import type { Prisma } from "@/app/generated/prisma/client";
 
 export interface LoadedPayment {
   payment: PaymentInput;
@@ -38,19 +39,12 @@ export async function loadReconciliationInputs(): Promise<LoadedPayment[]> {
   }));
 }
 
-export async function hasRunningRun(): Promise<boolean> {
-  const running = await prisma.reconciliationRun.findFirst({ where: { status: "RUNNING" } });
-  return running !== null;
-}
+export type StartRunResult = { status: "STARTED"; run: Awaited<ReturnType<typeof createRunRow>> } | { status: "ALREADY_RUNNING" };
 
-async function nextRunReference(): Promise<string> {
-  const count = await prisma.reconciliationRun.count();
-  return `RUN-${String(count + 1).padStart(6, "0")}`;
-}
-
-export async function createRunningRun(startedAt: Date) {
-  const runReference = await nextRunReference();
-  return prisma.reconciliationRun.create({
+async function createRunRow(tx: Prisma.TransactionClient, startedAt: Date) {
+  const count = await tx.reconciliationRun.count();
+  const runReference = `RUN-${String(count + 1).padStart(6, "0")}`;
+  return tx.reconciliationRun.create({
     data: {
       runReference,
       status: "RUNNING",
@@ -64,6 +58,40 @@ export async function createRunningRun(startedAt: Date) {
       countsByRule: "{}",
       countsBySeverity: "{}",
     },
+  });
+}
+
+/**
+ * Atomically checks for an in-progress run and creates a new one, in a single transaction so
+ * two near-simultaneous invocations (e.g. a double-click) can't both observe "no running run"
+ * and both proceed — the second transaction only starts once the first has committed, so it
+ * sees the row the first one created.
+ *
+ * A run still RUNNING after `maxRunDurationMinutes` is treated as abandoned (e.g. the server
+ * process crashed mid-run) and marked FAILED here, so a single stuck row can never permanently
+ * block every future run. Real runs complete in seconds at this project's data volume.
+ */
+export async function startRun(startedAt: Date): Promise<StartRunResult> {
+  return prisma.$transaction(async (tx) => {
+    const running = await tx.reconciliationRun.findFirst({ where: { status: "RUNNING" } });
+
+    if (running) {
+      const ageMinutes = (startedAt.getTime() - running.startedAt.getTime()) / (60 * 1000);
+      if (ageMinutes <= RECONCILIATION_CONFIG.maxRunDurationMinutes) {
+        return { status: "ALREADY_RUNNING" as const };
+      }
+      await tx.reconciliationRun.update({
+        where: { id: running.id },
+        data: {
+          status: "FAILED",
+          completedAt: startedAt,
+          errorMessage: `Run exceeded the maximum expected duration (${RECONCILIATION_CONFIG.maxRunDurationMinutes} minutes) and was treated as abandoned.`,
+        },
+      });
+    }
+
+    const run = await createRunRow(tx, startedAt);
+    return { status: "STARTED" as const, run };
   });
 }
 

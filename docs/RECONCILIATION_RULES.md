@@ -108,6 +108,16 @@ Running reconciliation repeatedly against unchanged data must never create dupli
 
 **Why no database-level unique constraint on `dedupeKey`:** a resolved issue that later *recurs* (e.g. a payment gets a new, different amount-mismatched settlement after the first was corrected) should be able to open a fresh case — a hard unique index would prevent that. The idempotency guarantee is therefore enforced in application logic (`lib/reconciliation-engine/persistence.ts#persistResults`), scoped to "currently open cases with this exact key," not the full history of the key. Historical `ReconciliationResult` rows are never deleted or overwritten — only `ExceptionCase.lastDetectedAt` is updated.
 
+Note that when a result re-links to an existing open case, only `lastDetectedAt` is refreshed — `severity`, `title` and `description` stay as they were when the case was first created, even if the current evaluation would now compute a different severity (e.g. a missing-settlement case created as `MEDIUM` that later becomes objectively `HIGH` as more time passes). This is a deliberate reading of the spec's "link the result, or update the timestamp" framing, not an oversight; each individual `ReconciliationResult` row still carries the *current* severity for that run, so the escalation is visible in the run/result history even though the `ExceptionCase` itself doesn't auto-escalate.
+
+## Concurrency and failure recovery
+
+`lib/reconciliation-engine/persistence.ts#startRun` performs the "is a run already in progress?" check and the creation of the new `RUNNING` row inside a single Prisma transaction, so two near-simultaneous invocations (e.g. a double-click on "Run reconciliation") can't both observe "nothing running" and both proceed — the two idempotency guarantees this document describes would otherwise be at risk of a race under genuine concurrent runs.
+
+A run still marked `RUNNING` after `maxRunDurationMinutes` (30, see `config.ts`) is treated as abandoned — most plausibly because the server process crashed or was killed mid-run — and is automatically marked `FAILED` (with an explanatory `errorMessage`) the next time anyone tries to start a run. Without this, a single crashed run would permanently block every future reconciliation run, since the "already running" check would never see anything else. Real runs complete in well under a second at this project's data volume, so 30 minutes is a generous margin, not a performance target.
+
+**Partial-write trade-off:** results are persisted incrementally, one `ReconciliationResult`/`ExceptionCase` write at a time, rather than inside one all-or-nothing transaction spanning the whole run. This is a deliberate choice: Prisma's interactive transactions have a default timeout (5s), and a single run can produce hundreds of writes — wrapping the entire run risks spurious timeout failures on an otherwise-healthy run, which is a worse failure mode than the rare case of a run dying mid-loop and leaving some rows committed under a run that ends up marked `FAILED`. Such a run is still clearly identifiable (status `FAILED`, an `errorMessage`, and counts that don't reflect a completed run) and — per the point above — never blocks subsequent runs.
+
 ## Configuration reference
 
 All in `lib/reconciliation-engine/config.ts`:
@@ -125,5 +135,6 @@ All in `lib/reconciliation-engine/config.ts`:
 ## Known limitations (engine-wide)
 
 - No pagination/streaming — a run loads every payment into memory in one query. Fine at this project's scale (dozens–hundreds of rows); would need batching at real production volume.
-- Rule evaluation is sequential, not parallelized, and persistence writes one row per evaluation rather than batching inserts — simple and easy to reason about, but not tuned for throughput.
+- Rule evaluation is sequential, not parallelized, and persistence writes one row per evaluation rather than batching inserts — simple and easy to reason about, but not tuned for throughput (see the partial-write trade-off above).
 - No authentication/authorization on the "Run reconciliation" action — anyone with access to the app can trigger a run. Out of scope for this sprint (no auth exists anywhere in the app yet).
+- All displayed timestamps (including SLA deadlines) are rendered in `Europe/Dublin` (`lib/format.ts`), independent of the host machine/container's own timezone. The underlying comparisons in every rule are always timezone-agnostic instant (millisecond) arithmetic — only *display* is timezone-pinned.

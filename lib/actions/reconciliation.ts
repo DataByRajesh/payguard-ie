@@ -29,6 +29,7 @@ export async function runReconciliationAction(): Promise<RunReconciliationAction
     if (error instanceof ReconciliationAlreadyRunningError) {
       return { success: false, message: error.message };
     }
+    console.error("Reconciliation run failed:", error);
     return { success: false, message: "Reconciliation run failed. Check server logs for details." };
   }
 }
