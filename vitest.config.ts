@@ -5,6 +5,9 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["lib/**/*.test.ts"],
+    env: {
+      DATABASE_URL: "file:./prisma/vitest.db",
+    },
   },
   resolve: {
     alias: {
