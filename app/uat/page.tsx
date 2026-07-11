@@ -1,44 +1,37 @@
-import { PlaceholderPage } from "@/components/placeholders/PlaceholderPage";
-import { Card } from "@/components/ui/Card";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { UatStatusBadge } from "@/components/badges";
-import { getUatTestCasesWithLatestExecution } from "@/lib/queries/uat";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { UatTable } from "@/components/uat/UatTable";
+import { getUatTestCasesWithLatestExecution, getUatSummary } from "@/lib/queries/uat";
 
 export const dynamic = "force-dynamic";
 
+function SummaryTile({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="mt-1 text-xl font-semibold text-slate-900 tabular-nums">{value}</p>
+    </div>
+  );
+}
+
 export default async function UatPage() {
-  const testCases = await getUatTestCasesWithLatestExecution();
+  const [testCases, summary] = await Promise.all([getUatTestCasesWithLatestExecution(), getUatSummary()]);
 
   return (
-    <PlaceholderPage
-      title="UAT"
-      description="User acceptance test management for payments-ops workflows. This sprint shows a read-only list of test cases and their latest execution; running new executions and attaching evidence directly is planned next."
-      upcoming={[
-        "Recording new test executions with evidence attachment",
-        "Test cycle and release sign-off tracking",
-        "Coverage reporting against payments/reconciliation features",
-      ]}
-      preview={
-        <Card title="Test cases (read-only preview)">
-          {testCases.length === 0 ? (
-            <EmptyState title="No UAT test cases yet" description="Seed the database to see preview data." />
-          ) : (
-            <ul className="flex flex-col gap-3">
-              {testCases.map((testCase) => (
-                <li key={testCase.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 p-3">
-                  <div>
-                    <p className="text-sm font-medium text-slate-900">
-                      {testCase.testCaseRef} — {testCase.title}
-                    </p>
-                    <p className="text-xs text-slate-400">{testCase.area}</p>
-                  </div>
-                  {testCase.executions[0] ? <UatStatusBadge status={testCase.executions[0].status} /> : null}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      }
-    />
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="UAT"
+        description="User acceptance test management for payments-ops workflows. Executions are recorded manually and may optionally be linked to an existing exception case — a failed execution never automatically creates one."
+      />
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <SummaryTile label="Test cases" value={testCases.length} />
+        <SummaryTile label="Pass" value={summary.pass} />
+        <SummaryTile label="Fail" value={summary.fail} />
+        <SummaryTile label="Blocked" value={summary.blocked} />
+        <SummaryTile label="Not run" value={summary.notRun} />
+      </div>
+
+      <UatTable testCases={testCases} />
+    </div>
   );
 }

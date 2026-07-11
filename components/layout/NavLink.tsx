@@ -15,6 +15,10 @@ export function NavLink({ href, label }: NavLinkProps) {
   return (
     <Link
       href={href}
+      // Every page here is dynamic (reads cookies for the acting user), so prefetching cannot
+      // be cached and Next re-issues it repeatedly — the resulting request storm was observed to
+      // starve out the fetch that carries a Server Action's own response under load.
+      prefetch={false}
       aria-current={isActive ? "page" : undefined}
       className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
         isActive ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"

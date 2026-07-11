@@ -9,6 +9,7 @@ import type {
 } from "@/app/generated/prisma/enums";
 import type { SettlementDisplayStatus } from "@/lib/reconciliation";
 import type { RuleType } from "@/lib/reconciliation-engine/types";
+import type { SlaState } from "@/lib/exception-workflow/types";
 
 export type BadgeTone = "neutral" | "info" | "success" | "warning" | "danger";
 
@@ -51,10 +52,19 @@ export const EXCEPTION_SEVERITY_PRESENTATION: Record<ExceptionSeverity, StatusPr
 
 export const EXCEPTION_STATUS_PRESENTATION: Record<ExceptionStatus, StatusPresentation> = {
   NEW: { label: "New", tone: "info" },
-  OPEN: { label: "Open", tone: "danger" },
-  IN_PROGRESS: { label: "In progress", tone: "warning" },
+  ASSIGNED: { label: "Assigned", tone: "neutral" },
+  INVESTIGATING: { label: "Investigating", tone: "warning" },
+  AWAITING_INFORMATION: { label: "Awaiting information", tone: "warning" },
   RESOLVED: { label: "Resolved", tone: "success" },
   CLOSED: { label: "Closed", tone: "neutral" },
+};
+
+export const SLA_STATE_PRESENTATION: Record<SlaState, StatusPresentation> = {
+  ON_TRACK: { label: "On track", tone: "success" },
+  DUE_SOON: { label: "Due soon", tone: "warning" },
+  OVERDUE: { label: "Overdue", tone: "danger" },
+  COMPLETED_ON_TIME: { label: "Completed on time", tone: "success" },
+  COMPLETED_LATE: { label: "Completed late", tone: "warning" },
 };
 
 export const EXCEPTION_TYPE_PRESENTATION: Record<ExceptionType, StatusPresentation> = {
@@ -90,7 +100,45 @@ export const RULE_RESULT_PRESENTATION: Record<"PASSED" | "FAILED", StatusPresent
 
 export const UAT_STATUS_PRESENTATION: Record<UATStatus, StatusPresentation> = {
   NOT_RUN: { label: "Not run", tone: "neutral" },
-  PASSED: { label: "Passed", tone: "success" },
-  FAILED: { label: "Failed", tone: "danger" },
+  PASS: { label: "Pass", tone: "success" },
+  FAIL: { label: "Fail", tone: "danger" },
   BLOCKED: { label: "Blocked", tone: "warning" },
+};
+
+export const ROOT_CAUSE_CATEGORY_LABELS: Record<string, string> = {
+  PROCESSING_CONFIGURATION: "Processing configuration",
+  SETTLEMENT_FILE_MISSING: "Settlement file missing",
+  UPSTREAM_PROVIDER_DELAY: "Upstream provider delay",
+  DUPLICATE_SUBMISSION: "Duplicate submission",
+  DATA_MAPPING_ERROR: "Data mapping error",
+  CURRENCY_CONFIGURATION: "Currency configuration",
+  STATUS_SYNCHRONISATION: "Status synchronisation",
+  MANUAL_PROCESSING_ERROR: "Manual processing error",
+  UNKNOWN: "Unknown",
+  OTHER: "Other",
+};
+
+export const RESOLUTION_ACTION_LABELS: Record<string, string> = {
+  CORRECTIVE_SETTLEMENT_APPLIED: "Corrective settlement applied",
+  PAYMENT_STATUS_CORRECTED: "Payment status corrected",
+  DUPLICATE_TRANSACTION_CANCELLED: "Duplicate transaction cancelled",
+  CONFIGURATION_CORRECTED: "Configuration corrected",
+  UPSTREAM_PROVIDER_CONFIRMED: "Upstream provider confirmed",
+  ACCEPTED_OPERATIONAL_EXCEPTION: "Accepted operational exception",
+  NO_ISSUE_FOUND: "No issue found",
+  OTHER: "Other",
+};
+
+export const EXCEPTION_NOTE_TYPE_LABELS: Record<string, string> = {
+  INVESTIGATION: "Investigation",
+  CUSTOMER_UPDATE: "Customer update",
+  TECHNICAL_FINDING: "Technical finding",
+  HANDOVER: "Handover",
+  RESOLUTION_NOTE: "Resolution note",
+};
+
+export const RELEASE_RECOMMENDATION_PRESENTATION: Record<string, StatusPresentation> = {
+  READY: { label: "Ready to release", tone: "success" },
+  CONDITIONAL: { label: "Conditional", tone: "warning" },
+  NOT_READY: { label: "Not ready", tone: "danger" },
 };

@@ -6,10 +6,18 @@ import {
   EXCEPTION_STATUS_VALUES,
   EXCEPTION_TYPE_VALUES,
 } from "@/lib/validation/exceptions";
-import { EXCEPTION_SEVERITY_PRESENTATION, EXCEPTION_STATUS_PRESENTATION, EXCEPTION_TYPE_PRESENTATION } from "@/lib/status";
+import { SLA_STATES, ROOT_CAUSE_CATEGORIES } from "@/lib/exception-workflow/types";
+import {
+  EXCEPTION_SEVERITY_PRESENTATION,
+  EXCEPTION_STATUS_PRESENTATION,
+  EXCEPTION_TYPE_PRESENTATION,
+  ROOT_CAUSE_CATEGORY_LABELS,
+  SLA_STATE_PRESENTATION,
+} from "@/lib/status";
 import type { ExceptionsQuery } from "@/lib/validation/exceptions";
+import type { User } from "@/app/generated/prisma/client";
 
-export function ExceptionsFilterBar({ defaultValues }: { defaultValues: ExceptionsQuery }) {
+export function ExceptionsFilterBar({ defaultValues, users }: { defaultValues: ExceptionsQuery; users: User[] }) {
   const formRef = useRef<HTMLFormElement>(null);
 
   return (
@@ -75,6 +83,38 @@ export function ExceptionsFilterBar({ defaultValues }: { defaultValues: Exceptio
       </div>
 
       <div className="flex flex-col gap-1">
+        <label htmlFor="ownerId" className="text-xs font-medium text-slate-600">
+          Owner
+        </label>
+        <select
+          id="ownerId"
+          name="ownerId"
+          defaultValue={defaultValues.ownerId ?? ""}
+          onChange={() => formRef.current?.requestSubmit()}
+          className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
+        >
+          <option value="">All owners</option>
+          {users.map((user) => (
+            <option key={user.id} value={user.id}>
+              {user.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <label className="flex items-center gap-1.5 pb-1.5 text-xs font-medium text-slate-600">
+        <input
+          type="checkbox"
+          name="unassigned"
+          value="true"
+          defaultChecked={defaultValues.unassigned === "true"}
+          onChange={() => formRef.current?.requestSubmit()}
+          className="h-4 w-4 rounded border-slate-300"
+        />
+        Unassigned only
+      </label>
+
+      <div className="flex flex-col gap-1">
         <label htmlFor="slaState" className="text-xs font-medium text-slate-600">
           SLA state
         </label>
@@ -86,8 +126,31 @@ export function ExceptionsFilterBar({ defaultValues }: { defaultValues: Exceptio
           className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
         >
           <option value="">All</option>
-          <option value="BREACHED">Breached</option>
-          <option value="WITHIN">Within SLA</option>
+          {SLA_STATES.map((state) => (
+            <option key={state} value={state}>
+              {SLA_STATE_PRESENTATION[state].label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label htmlFor="rootCause" className="text-xs font-medium text-slate-600">
+          Root cause
+        </label>
+        <select
+          id="rootCause"
+          name="rootCause"
+          defaultValue={defaultValues.rootCause ?? ""}
+          onChange={() => formRef.current?.requestSubmit()}
+          className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
+        >
+          <option value="">All root causes</option>
+          {ROOT_CAUSE_CATEGORIES.map((category) => (
+            <option key={category} value={category}>
+              {ROOT_CAUSE_CATEGORY_LABELS[category]}
+            </option>
+          ))}
         </select>
       </div>
 
