@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "pretest": "tsx scripts/setup-vitest-db.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "pretest:e2e": "tsx scripts/setup-e2e-db.ts",

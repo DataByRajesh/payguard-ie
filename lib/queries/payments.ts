@@ -46,7 +46,7 @@ export async function getPaymentById(id: string) {
       customer: true,
       settlement: true,
       exceptionCases: {
-        include: { comments: true, evidenceRecords: true },
+        include: { comments: { include: { authorUser: true }, orderBy: { createdAt: "asc" } }, evidenceRecords: true, assignedUser: true },
         orderBy: { openedAt: "desc" },
       },
       reconciliationResults: {

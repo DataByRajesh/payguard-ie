@@ -1,20 +1,24 @@
 import Link from "next/link";
 import { DataTable, type DataTableColumn } from "@/components/ui/DataTable";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { ExceptionSeverityBadge, ExceptionStatusBadge, ExceptionTypeBadge } from "@/components/badges";
+import { ExceptionSeverityBadge, ExceptionStatusBadge, ExceptionTypeBadge, SlaStateBadge } from "@/components/badges";
 import { formatDate } from "@/lib/format";
-import type { ExceptionCase, Payment, Settlement } from "@/app/generated/prisma/client";
+import { calculateSlaState } from "@/lib/exception-workflow/sla";
+import type { ExceptionCase, Payment, Settlement, User } from "@/app/generated/prisma/client";
 
 export interface ExceptionListItem extends ExceptionCase {
   payment: Payment & { settlement: Settlement | null };
+  assignedUser: User | null;
 }
 
 export function ExceptionsTable({
   exceptions,
   hasActiveFilters,
+  now = new Date(),
 }: {
   exceptions: ExceptionListItem[];
   hasActiveFilters: boolean;
+  now?: Date;
 }) {
   const columns: DataTableColumn<ExceptionListItem>[] = [
     {
@@ -30,6 +34,7 @@ export function ExceptionsTable({
     { key: "type", header: "Type", render: (exceptionCase) => <ExceptionTypeBadge type={exceptionCase.type} /> },
     { key: "severity", header: "Severity", render: (exceptionCase) => <ExceptionSeverityBadge severity={exceptionCase.severity} /> },
     { key: "status", header: "Status", render: (exceptionCase) => <ExceptionStatusBadge status={exceptionCase.status} /> },
+    { key: "owner", header: "Owner", render: (exceptionCase) => exceptionCase.assignedUser?.name ?? "Unassigned" },
     {
       key: "payment",
       header: "Payment",
@@ -39,13 +44,14 @@ export function ExceptionsTable({
         </Link>
       ),
     },
-    {
-      key: "settlement",
-      header: "Settlement",
-      render: (exceptionCase) => exceptionCase.payment.settlement?.settlementReference ?? "—",
-    },
     { key: "detected", header: "Detected", render: (exceptionCase) => formatDate(exceptionCase.openedAt) },
-    { key: "slaDeadline", header: "SLA deadline", render: (exceptionCase) => formatDate(exceptionCase.slaDeadline) },
+    {
+      key: "sla",
+      header: "SLA",
+      render: (exceptionCase) => (
+        <SlaStateBadge state={calculateSlaState({ slaDeadline: exceptionCase.slaDeadline, closedAt: exceptionCase.closedAt, now }).state} />
+      ),
+    },
   ];
 
   return (

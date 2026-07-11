@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { EXCEPTION_STATUSES, ROOT_CAUSE_CATEGORIES, SLA_STATES } from "@/lib/exception-workflow/types";
 
 export const EXCEPTION_TYPE_VALUES = [
   "AMOUNT_MISMATCH",
@@ -12,15 +13,16 @@ export const EXCEPTION_TYPE_VALUES = [
 
 export const EXCEPTION_SEVERITY_VALUES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const;
 
-export const EXCEPTION_STATUS_VALUES = ["NEW", "OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"] as const;
-
-export const SLA_STATE_VALUES = ["BREACHED", "WITHIN"] as const;
+export const EXCEPTION_STATUS_VALUES = EXCEPTION_STATUSES;
 
 export const exceptionsQuerySchema = z.object({
   type: z.enum(EXCEPTION_TYPE_VALUES).optional(),
   severity: z.enum(EXCEPTION_SEVERITY_VALUES).optional(),
   status: z.enum(EXCEPTION_STATUS_VALUES).optional(),
-  slaState: z.enum(SLA_STATE_VALUES).optional(),
+  ownerId: z.string().trim().min(1).optional(),
+  unassigned: z.literal("true").optional(),
+  slaState: z.enum(SLA_STATES).optional(),
+  rootCause: z.enum(ROOT_CAUSE_CATEGORIES).optional(),
   q: z.string().trim().max(100).optional(),
 });
 

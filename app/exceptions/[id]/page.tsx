@@ -4,16 +4,24 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { ExceptionSummaryCard } from "@/components/exceptions/ExceptionSummaryCard";
 import { TriggeringResultCard } from "@/components/exceptions/TriggeringResultCard";
 import { AuditTimeline } from "@/components/exceptions/AuditTimeline";
-import { CommentsAndEvidence } from "@/components/exceptions/CommentsAndEvidence";
+import { NotesPanel } from "@/components/exceptions/NotesPanel";
+import { EvidencePanel } from "@/components/exceptions/EvidencePanel";
+import { OwnerAndActionsCard } from "@/components/exceptions/OwnerAndActionsCard";
+import { RootCauseCard } from "@/components/exceptions/RootCauseCard";
+import { ResolutionCard } from "@/components/exceptions/ResolutionCard";
+import { ApprovalCard } from "@/components/exceptions/ApprovalCard";
 import { PaymentSummaryCard } from "@/components/payments/PaymentSummaryCard";
 import { getExceptionCaseById } from "@/lib/queries/exceptions";
 import { getAuditEventsForEntity } from "@/lib/queries/audit";
+import { getAssignableUsers, getActingUser } from "@/lib/acting-user";
 import { deriveSettlementDisplayStatus } from "@/lib/reconciliation";
 import { idParamSchema } from "@/lib/validation/common";
 
 interface ExceptionDetailPageProps {
   params: Promise<{ id: string }>;
 }
+
+export const dynamic = "force-dynamic";
 
 export default async function ExceptionDetailPage({ params }: ExceptionDetailPageProps) {
   const { id } = await params;
@@ -27,7 +35,11 @@ export default async function ExceptionDetailPage({ params }: ExceptionDetailPag
     notFound();
   }
 
-  const auditEvents = await getAuditEventsForEntity("EXCEPTION_CASE", exceptionCase.id);
+  const [auditEvents, users, actingUser] = await Promise.all([
+    getAuditEventsForEntity("EXCEPTION_CASE", exceptionCase.id),
+    getAssignableUsers(),
+    getActingUser(),
+  ]);
   const triggeringResult = exceptionCase.reconciliationResults[0];
   const settlementDisplayStatus = deriveSettlementDisplayStatus(exceptionCase.payment, exceptionCase.payment.settlement);
 
@@ -45,15 +57,63 @@ export default async function ExceptionDetailPage({ params }: ExceptionDetailPag
         }
       />
       <ExceptionSummaryCard exceptionCase={exceptionCase} />
-      <PaymentSummaryCard
-        payment={exceptionCase.payment}
-        customer={exceptionCase.payment.customer}
-        settlement={exceptionCase.payment.settlement}
-        settlementDisplayStatus={settlementDisplayStatus}
-      />
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <PaymentSummaryCard
+          payment={exceptionCase.payment}
+          customer={exceptionCase.payment.customer}
+          settlement={exceptionCase.payment.settlement}
+          settlementDisplayStatus={settlementDisplayStatus}
+        />
+        <OwnerAndActionsCard
+          exceptionId={exceptionCase.id}
+          version={exceptionCase.version}
+          status={exceptionCase.status}
+          assignedUser={exceptionCase.assignedUser}
+          users={users}
+        />
+      </div>
+
       <TriggeringResultCard result={triggeringResult} />
+
+      <RootCauseCard
+        exceptionId={exceptionCase.id}
+        version={exceptionCase.version}
+        status={exceptionCase.status}
+        rootCauseCategory={exceptionCase.rootCauseCategory}
+        rootCauseSummary={exceptionCase.rootCauseSummary}
+        rootCauseIdentifiedByName={exceptionCase.rootCauseIdentifiedByUser?.name ?? null}
+        rootCauseIdentifiedAt={exceptionCase.rootCauseIdentifiedAt}
+      />
+
+      <ResolutionCard
+        exceptionId={exceptionCase.id}
+        version={exceptionCase.version}
+        status={exceptionCase.status}
+        hasRootCause={Boolean(exceptionCase.rootCauseCategory)}
+        hasOwner={Boolean(exceptionCase.assignedUserId)}
+        resolutionAction={exceptionCase.resolutionAction}
+        resolutionSummary={exceptionCase.resolutionSummary}
+        resolutionUserName={exceptionCase.resolutionUser?.name ?? null}
+        resolutionAt={exceptionCase.resolutionAt}
+      />
+
+      <ApprovalCard
+        exceptionId={exceptionCase.id}
+        version={exceptionCase.version}
+        status={exceptionCase.status}
+        evidenceCount={exceptionCase.evidenceRecords.length}
+        resolutionUserId={exceptionCase.resolutionUserId}
+        actingUserId={actingUser.id}
+        approvalDecision={exceptionCase.approvalDecision}
+        approverName={exceptionCase.approverUser?.name ?? null}
+        approvalNote={exceptionCase.approvalNote}
+        approvalAt={exceptionCase.approvalAt}
+      />
+
+      <EvidencePanel exceptionId={exceptionCase.id} version={exceptionCase.version} evidenceRecords={exceptionCase.evidenceRecords} />
+      <NotesPanel exceptionId={exceptionCase.id} version={exceptionCase.version} notes={exceptionCase.comments} />
       <AuditTimeline events={auditEvents} />
-      <CommentsAndEvidence comments={exceptionCase.comments} evidenceRecords={exceptionCase.evidenceRecords} />
     </div>
   );
 }

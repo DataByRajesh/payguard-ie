@@ -6,9 +6,11 @@ import {
   PAYMENT_STATUS_PRESENTATION,
   RECONCILIATION_RULE_TYPE_PRESENTATION,
   RECONCILIATION_RUN_STATUS_PRESENTATION,
+  RELEASE_RECOMMENDATION_PRESENTATION,
   RULE_RESULT_PRESENTATION,
   SETTLEMENT_DISPLAY_STATUS_PRESENTATION,
   SETTLEMENT_STATUS_PRESENTATION,
+  SLA_STATE_PRESENTATION,
   UAT_STATUS_PRESENTATION,
 } from "@/lib/status";
 import type {
@@ -22,6 +24,8 @@ import type {
 } from "@/app/generated/prisma/client";
 import type { SettlementDisplayStatus } from "@/lib/reconciliation";
 import type { RuleType } from "@/lib/reconciliation-engine/types";
+import type { ReleaseRecommendation } from "@/lib/exception-workflow/uatRecommendation";
+import type { SlaState } from "@/lib/exception-workflow/types";
 
 export function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
   const { label, tone } = PAYMENT_STATUS_PRESENTATION[status];
@@ -70,5 +74,15 @@ export function RuleTypeBadge({ rule }: { rule: RuleType }) {
 
 export function RuleResultBadge({ passed }: { passed: boolean }) {
   const { label, tone } = RULE_RESULT_PRESENTATION[passed ? "PASSED" : "FAILED"];
+  return <StatusBadge label={label} tone={tone} />;
+}
+
+export function SlaStateBadge({ state }: { state: SlaState }) {
+  const { label, tone } = SLA_STATE_PRESENTATION[state];
+  return <StatusBadge label={label} tone={tone} />;
+}
+
+export function ReleaseRecommendationBadge({ recommendation }: { recommendation: ReleaseRecommendation }) {
+  const { label, tone } = RELEASE_RECOMMENDATION_PRESENTATION[recommendation];
   return <StatusBadge label={label} tone={tone} />;
 }
