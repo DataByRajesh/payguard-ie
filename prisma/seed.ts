@@ -1,16 +1,6 @@
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-import {
-  PrismaClient,
-  type Customer,
-  type Payment,
-  type Settlement,
-  type PaymentStatus,
-  type SettlementStatus,
-  type ExceptionType,
-  type ExceptionSeverity,
-  type ExceptionStatus,
-} from "../app/generated/prisma/client";
-import { deriveSettlementDisplayStatus } from "../lib/reconciliation";
+import { PrismaClient, type Customer, type Payment, type PaymentStatus, type Settlement, type SettlementStatus } from "../app/generated/prisma/client";
+import { runReconciliation } from "../lib/reconciliation-engine/service";
 import {
   createRng,
   pick,
@@ -34,12 +24,12 @@ const MS_PER_DAY_LOCAL = 24 * 60 * 60 * 1000;
 
 let paymentSeq = 1;
 let settlementSeq = 1;
-let caseSeq = 1;
 let evidenceSeq = 1;
 
 type Currency = "EUR" | "GBP";
 const EUR_METHODS = ["SEPA_CREDIT_TRANSFER", "SEPA_DIRECT_DEBIT", "CARD"] as const;
 const GBP_METHODS = ["FASTER_PAYMENTS", "CARD", "SWIFT"] as const;
+type PaymentMethodValue = (typeof EUR_METHODS)[number] | (typeof GBP_METHODS)[number];
 
 const createdPayments: { payment: Payment; settlement: Settlement | null }[] = [];
 
@@ -50,6 +40,7 @@ async function createPayment(params: {
   status: PaymentStatus;
   createdAt: Date;
   expectedSettlementAt: Date;
+  method?: PaymentMethodValue;
 }): Promise<Payment> {
   const methods = params.currency === "EUR" ? EUR_METHODS : GBP_METHODS;
   const payment = await prisma.payment.create({
@@ -58,7 +49,7 @@ async function createPayment(params: {
       customerId: params.customer.id,
       amountMinor: params.amountMinor,
       currency: params.currency,
-      paymentMethod: pick(rng, methods),
+      paymentMethod: params.method ?? pick(rng, methods),
       status: params.status,
       createdAt: params.createdAt,
       updatedAt: params.createdAt,
@@ -89,56 +80,6 @@ async function createSettlement(
   const entry = createdPayments.find((p) => p.payment.id === payment.id);
   if (entry) entry.settlement = settlement;
   return settlement;
-}
-
-async function createExceptionCase(
-  payment: Payment,
-  params: {
-    type: ExceptionType;
-    severity: ExceptionSeverity;
-    status: ExceptionStatus;
-    title: string;
-    description: string;
-    assignedTo?: string;
-    comments: { author: string; body: string }[];
-    withEvidence?: boolean;
-  },
-) {
-  const exceptionCase = await prisma.exceptionCase.create({
-    data: {
-      caseReference: makeReference("EXC", caseSeq++),
-      paymentId: payment.id,
-      type: params.type,
-      severity: params.severity,
-      status: params.status,
-      title: params.title,
-      description: params.description,
-      assignedTo: params.assignedTo,
-      openedAt: payment.createdAt,
-      resolvedAt: params.status === "RESOLVED" || params.status === "CLOSED" ? hoursFromNow(randomInt(rng, 4, 48), payment.createdAt) : null,
-    },
-  });
-
-  for (const comment of params.comments) {
-    await prisma.exceptionComment.create({
-      data: { exceptionCaseId: exceptionCase.id, author: comment.author, body: comment.body },
-    });
-  }
-
-  if (params.withEvidence) {
-    await prisma.evidenceRecord.create({
-      data: {
-        evidenceRef: makeReference("EVD", evidenceSeq++),
-        type: "LOG_EXTRACT",
-        title: `Investigation log — ${exceptionCase.caseReference}`,
-        description: "Transaction log extract supporting the exception investigation.",
-        fileReference: `/evidence/${exceptionCase.caseReference.toLowerCase()}.log`,
-        exceptionCaseId: exceptionCase.id,
-      },
-    });
-  }
-
-  return exceptionCase;
 }
 
 async function createAuditEvent(
@@ -218,7 +159,21 @@ async function main() {
     return customer.country === "IE" ? "EUR" : "GBP";
   }
 
-  // 4. Bucket A — happy path: successful payment with matching / correctly settled settlement (15).
+  // Payment ids per scenario, so we can annotate the engine-created exceptions afterwards.
+  const scenarioPaymentIds: Record<
+    "missingSettlement" | "amountMismatch" | "currencyMismatch" | "duplicate" | "delayedSettlement" | "stuckPayment" | "invalidStatusCombination",
+    string[]
+  > = {
+    missingSettlement: [],
+    amountMismatch: [],
+    currencyMismatch: [],
+    duplicate: [],
+    delayedSettlement: [],
+    stuckPayment: [],
+    invalidStatusCombination: [],
+  };
+
+  // 4a. Bucket A — happy path: successful payment with matching / correctly settled settlement (15).
   for (let i = 0; i < 15; i++) {
     const customer = nextCustomer(i);
     const currency = currencyFor(customer);
@@ -232,12 +187,14 @@ async function main() {
     await createAuditEvent("PAYMENT", payment.id, "SETTLEMENT_MATCHED", "Settlement file matched payment with no discrepancies.", "SYSTEM", settledAt);
   }
 
-  // 4b. Bucket B — completed, no settlement (4): 2 recent (still within SLA), 2 past SLA (MISSING exception).
+  // 4b. Bucket B — completed, no settlement (4): 2 recent (still within SLA at seed time), 2 past SLA
+  // (the reconciliation engine's missing-settlement rule detects these live — no manual exception needed).
   for (let i = 0; i < 2; i++) {
     const customer = nextCustomer(i + 15);
     const currency = currencyFor(customer);
     const createdAt = hoursAgo(randomInt(rng, 6, 36), now);
-    const expectedSettlementAt = hoursFromNow(randomInt(rng, 12, 48), createdAt);
+    // Relative to `now` (not createdAt) so this reliably stays within SLA regardless of the createdAt draw.
+    const expectedSettlementAt = hoursFromNow(randomInt(rng, 12, 48), now);
     await createPayment({ customer, currency, amountMinor: randomInt(rng, 3000, 150000), status: "COMPLETED", createdAt, expectedSettlementAt });
   }
   for (let i = 0; i < 2; i++) {
@@ -246,17 +203,7 @@ async function main() {
     const createdAt = daysAgo(randomInt(rng, 10, 15), now);
     const expectedSettlementAt = daysAgo(randomInt(rng, 2, 5), now);
     const payment = await createPayment({ customer, currency, amountMinor: randomInt(rng, 3000, 150000), status: "COMPLETED", createdAt, expectedSettlementAt });
-    await createExceptionCase(payment, {
-      type: "MISSING_SETTLEMENT",
-      severity: "HIGH",
-      status: pick(rng, ["OPEN", "IN_PROGRESS"] as const),
-      title: `No settlement received for ${payment.paymentReference}`,
-      description: "Payment completed successfully but no matching settlement file has been received past the expected settlement date.",
-      assignedTo: pick(rng, opsAnalysts).name,
-      comments: [{ author: pick(rng, opsAnalysts).name, body: "Checked latest settlement batch — no matching reference found. Escalating to scheme operations." }],
-      withEvidence: true,
-    });
-    await createAuditEvent("EXCEPTION_CASE", payment.id, "EXCEPTION_RAISED", "Missing-settlement exception raised past SLA.", "SYSTEM", expectedSettlementAt);
+    scenarioPaymentIds.missingSettlement.push(payment.id);
   }
 
   // 4c. Bucket C — amount mismatch (5).
@@ -269,19 +216,8 @@ async function main() {
     const payment = await createPayment({ customer, currency, amountMinor, status: "COMPLETED", createdAt, expectedSettlementAt });
     const deltaMinor = randomInt(rng, 500, 8000) * (rng() > 0.5 ? 1 : -1);
     const settledAmountMinor = amountMinor + deltaMinor;
-    const settlement = await createSettlement(payment, { amountMinor: settledAmountMinor, currency, status: "SETTLED", settledAt: hoursAgo(randomInt(rng, 1, 6), expectedSettlementAt) });
-    const severity: ExceptionSeverity = Math.abs(deltaMinor) / amountMinor > 0.2 ? "HIGH" : "MEDIUM";
-    await createExceptionCase(payment, {
-      type: "AMOUNT_MISMATCH",
-      severity,
-      status: pick(rng, ["OPEN", "IN_PROGRESS", "RESOLVED"] as const),
-      title: `Settlement amount does not match payment for ${payment.paymentReference}`,
-      description: `Payment amount and settlement amount differ (payment ${currency} minor units: ${amountMinor}, settlement: ${settledAmountMinor}).`,
-      assignedTo: pick(rng, opsAnalysts).name,
-      comments: [{ author: pick(rng, opsAnalysts).name, body: "Confirmed discrepancy against source settlement file. Requesting correction from scheme." }],
-      withEvidence: true,
-    });
-    await createAuditEvent("EXCEPTION_CASE", payment.id, "EXCEPTION_RAISED", "Amount-mismatch exception raised.", "SYSTEM", settlement.settledAt ?? createdAt);
+    await createSettlement(payment, { amountMinor: settledAmountMinor, currency, status: "SETTLED", settledAt: hoursAgo(randomInt(rng, 1, 6), expectedSettlementAt) });
+    scenarioPaymentIds.amountMismatch.push(payment.id);
   }
 
   // 4d. Bucket D — currency mismatch (4).
@@ -294,26 +230,19 @@ async function main() {
     const expectedSettlementAt = hoursFromNow(randomInt(rng, 24, 48), createdAt);
     const payment = await createPayment({ customer, currency, amountMinor, status: "COMPLETED", createdAt, expectedSettlementAt });
     await createSettlement(payment, { amountMinor, currency: otherCurrency, status: "SETTLED", settledAt: hoursAgo(randomInt(rng, 1, 6), expectedSettlementAt) });
-    await createExceptionCase(payment, {
-      type: "CURRENCY_MISMATCH",
-      severity: "HIGH",
-      status: pick(rng, ["OPEN", "IN_PROGRESS"] as const),
-      title: `Settlement currency does not match payment for ${payment.paymentReference}`,
-      description: `Payment was processed in ${currency} but the settlement file recorded ${otherCurrency}.`,
-      assignedTo: pick(rng, opsAnalysts).name,
-      comments: [{ author: pick(rng, opsAnalysts).name, body: "Likely a file-processing error at the settlement provider — raised with their support desk." }],
-      withEvidence: false,
-    });
+    scenarioPaymentIds.currencyMismatch.push(payment.id);
   }
 
-  // 4e. Bucket E — duplicate payment (3 pairs, 6 payments).
+  // 4e. Bucket E — duplicate payment (3 pairs, 6 payments). The pair shares customer, amount,
+  // currency AND payment method so the engine's fingerprint-based duplicate rule detects it.
   for (let i = 0; i < 3; i++) {
     const customer = nextCustomer(i + 28);
     const currency = currencyFor(customer);
+    const method = pick(rng, currency === "EUR" ? EUR_METHODS : GBP_METHODS);
     const amountMinor = randomInt(rng, 5000, 150000);
     const createdAt = daysAgo(randomInt(rng, 5, 12), now);
     const expectedSettlementAt = hoursFromNow(randomInt(rng, 24, 48), createdAt);
-    const original = await createPayment({ customer, currency, amountMinor, status: "COMPLETED", createdAt, expectedSettlementAt });
+    const original = await createPayment({ customer, currency, amountMinor, status: "COMPLETED", createdAt, expectedSettlementAt, method });
     await createSettlement(original, { amountMinor, currency, status: "SETTLED", settledAt: hoursAgo(randomInt(rng, 1, 6), expectedSettlementAt) });
 
     const duplicateCreatedAt = hoursFromNow(randomInt(rng, 1, 3), createdAt);
@@ -324,20 +253,9 @@ async function main() {
       status: "COMPLETED",
       createdAt: duplicateCreatedAt,
       expectedSettlementAt: hoursFromNow(randomInt(rng, 24, 48), duplicateCreatedAt),
+      method,
     });
-    await createExceptionCase(duplicate, {
-      type: "DUPLICATE_PAYMENT",
-      severity: "CRITICAL",
-      status: pick(rng, ["OPEN", "IN_PROGRESS"] as const),
-      title: `Possible duplicate of ${original.paymentReference}`,
-      description: `Payment ${duplicate.paymentReference} matches customer, amount and currency of ${original.paymentReference} submitted ${Math.round(
-        (duplicateCreatedAt.getTime() - createdAt.getTime()) / (60 * 60 * 1000),
-      )}h earlier. Likely a duplicate submission.`,
-      assignedTo: pick(rng, opsAnalysts).name,
-      comments: [{ author: pick(rng, opsAnalysts).name, body: "Confirmed with customer service — customer confirms only one purchase was intended. Reversal requested." }],
-      withEvidence: true,
-    });
-    await createAuditEvent("EXCEPTION_CASE", duplicate.id, "EXCEPTION_RAISED", "Duplicate-payment exception raised.", "SYSTEM", duplicateCreatedAt);
+    scenarioPaymentIds.duplicate.push(duplicate.id);
   }
 
   // 4f. Bucket F — delayed settlement (5).
@@ -350,16 +268,7 @@ async function main() {
     const payment = await createPayment({ customer, currency, amountMinor, status: "COMPLETED", createdAt, expectedSettlementAt });
     const lateSettledAt = new Date(expectedSettlementAt.getTime() + randomInt(rng, 1, 5) * MS_PER_DAY_LOCAL);
     await createSettlement(payment, { amountMinor, currency, status: "SETTLED", settledAt: lateSettledAt });
-    await createExceptionCase(payment, {
-      type: "DELAYED_SETTLEMENT",
-      severity: pick(rng, ["MEDIUM", "HIGH"] as const),
-      status: pick(rng, ["RESOLVED", "CLOSED", "IN_PROGRESS"] as const),
-      title: `Settlement received late for ${payment.paymentReference}`,
-      description: "Settlement was received after the expected settlement date. Root cause traced to a delayed batch file from the settlement provider.",
-      assignedTo: pick(rng, opsAnalysts).name,
-      comments: [{ author: pick(rng, opsAnalysts).name, body: "Settlement has now been received; monitoring provider for recurrence." }],
-      withEvidence: true,
-    });
+    scenarioPaymentIds.delayedSettlement.push(payment.id);
   }
 
   // 4g. Bucket G — pending, beyond SLA (4).
@@ -369,20 +278,10 @@ async function main() {
     const createdAt = daysAgo(randomInt(rng, 10, 20), now);
     const expectedSettlementAt = daysAgo(randomInt(rng, 1, 6), now);
     const payment = await createPayment({ customer, currency, amountMinor: randomInt(rng, 3000, 180000), status: "PENDING", createdAt, expectedSettlementAt });
-    await createExceptionCase(payment, {
-      type: "SLA_BREACH",
-      severity: pick(rng, ["HIGH", "CRITICAL"] as const),
-      status: "OPEN",
-      title: `Payment still pending past SLA for ${payment.paymentReference}`,
-      description: "Payment has remained in PENDING status past its expected settlement date without progressing to completion.",
-      assignedTo: pick(rng, opsAnalysts).name,
-      comments: [{ author: pick(rng, opsAnalysts).name, body: "Escalated to processing provider for status update." }],
-      withEvidence: false,
-    });
-    await createAuditEvent("EXCEPTION_CASE", payment.id, "EXCEPTION_RAISED", "SLA-breach exception raised for pending payment.", "SYSTEM", expectedSettlementAt);
+    scenarioPaymentIds.stuckPayment.push(payment.id);
   }
 
-  // 4h. Bucket H — failed payment (5). No settlement, no exception case: failed payments never reach settlement processing.
+  // 4h. Bucket H — failed payment (5). No settlement: failed payments never reach settlement processing.
   for (let i = 0; i < 5; i++) {
     const customer = nextCustomer(i + 40);
     const currency = currencyFor(customer);
@@ -392,54 +291,130 @@ async function main() {
     await createAuditEvent("PAYMENT", payment.id, "PAYMENT_FAILED", "Payment processing failed at the acquirer.", "SYSTEM", createdAt);
   }
 
+  // 4i. Bucket I — invalid payment/settlement status combination (2). The only rule with no
+  // other natural source bucket: a FAILED and a REVERSED ("cancelled") payment that each still
+  // have a SETTLED settlement on file, which should never happen in a healthy lifecycle.
+  {
+    const customer = nextCustomer(45);
+    const currency = currencyFor(customer);
+    const amountMinor = randomInt(rng, 5000, 150000);
+    const createdAt = daysAgo(randomInt(rng, 3, 10), now);
+    const expectedSettlementAt = hoursFromNow(randomInt(rng, 24, 48), createdAt);
+    const payment = await createPayment({ customer, currency, amountMinor, status: "FAILED", createdAt, expectedSettlementAt });
+    await createSettlement(payment, { amountMinor, currency, status: "SETTLED", settledAt: hoursAgo(randomInt(rng, 1, 6), expectedSettlementAt) });
+    scenarioPaymentIds.invalidStatusCombination.push(payment.id);
+  }
+  {
+    const customer = nextCustomer(46);
+    const currency = currencyFor(customer);
+    const amountMinor = randomInt(rng, 5000, 150000);
+    const createdAt = daysAgo(randomInt(rng, 3, 10), now);
+    const expectedSettlementAt = hoursFromNow(randomInt(rng, 24, 48), createdAt);
+    const payment = await createPayment({ customer, currency, amountMinor, status: "REVERSED", createdAt, expectedSettlementAt });
+    await createSettlement(payment, { amountMinor, currency, status: "SETTLED", settledAt: hoursAgo(randomInt(rng, 1, 6), expectedSettlementAt) });
+    scenarioPaymentIds.invalidStatusCombination.push(payment.id);
+  }
+
   console.log(`Created ${createdPayments.length} payments.`);
 
-  // 5. Reconciliation run + one result per payment, computed via the same live-derivation
-  //    function the Payments/Settlements pages use, so seed data can never disagree with the UI.
-  const results = createdPayments.map(({ payment, settlement }) => ({
-    payment,
-    settlement,
-    outcome: deriveSettlementDisplayStatus(
-      payment,
-      settlement
-        ? { currency: settlement.currency, amountMinor: settlement.amountMinor, status: settlement.status, settledAt: settlement.settledAt }
-        : null,
-      now,
-    ),
-  }));
-  const matchedCount = results.filter((r) => r.outcome === "MATCHED").length;
-  const run = await prisma.reconciliationRun.create({
-    data: {
-      runReference: makeReference("RUN", 1),
-      runAt: now,
-      totalPayments: results.length,
-      matchedCount,
-      exceptionCount: results.length - matchedCount,
-    },
-  });
-  for (const r of results) {
-    await prisma.reconciliationResult.create({
-      data: {
-        reconciliationRunId: run.id,
-        paymentId: r.payment.id,
-        settlementId: r.settlement?.id,
-        outcome: r.outcome,
-        notes: r.outcome !== "MATCHED" ? "See linked exception case (if any) for investigation detail." : null,
-      },
+  // 5. Run the real deterministic reconciliation engine. This is what generates the
+  // ReconciliationRun, ReconciliationResult and ExceptionCase rows now — replacing Sprint 1's
+  // hand-authored exception seeding — so seed data and engine behaviour can never disagree.
+  const runResult = await runReconciliation(now);
+  console.log(
+    `Reconciliation run ${runResult.runReference}: ${runResult.summary.passedCount} passed, ${runResult.summary.failedCount} failed, ${runResult.summary.exceptionsCreated} exceptions created.`,
+  );
+
+  // 6. Annotate a subset of the engine-created exceptions with investigation comments/evidence
+  // and advance a few statuses, purely for UI variety in this seed snapshot.
+  async function annotateException(
+    paymentId: string,
+    opts: { comments: { author: string; body: string }[]; withEvidence?: boolean; status?: "IN_PROGRESS" | "RESOLVED" },
+  ) {
+    const exceptionCase = await prisma.exceptionCase.findFirst({ where: { paymentId }, orderBy: { createdAt: "asc" } });
+    if (!exceptionCase) return;
+
+    for (const comment of opts.comments) {
+      await prisma.exceptionComment.create({
+        data: { exceptionCaseId: exceptionCase.id, author: comment.author, body: comment.body },
+      });
+    }
+
+    if (opts.withEvidence) {
+      await prisma.evidenceRecord.create({
+        data: {
+          evidenceRef: makeReference("EVD", evidenceSeq++),
+          type: "LOG_EXTRACT",
+          title: `Investigation log — ${exceptionCase.caseReference}`,
+          description: "Transaction log extract supporting the exception investigation.",
+          fileReference: `/evidence/${exceptionCase.caseReference.toLowerCase()}.log`,
+          exceptionCaseId: exceptionCase.id,
+        },
+      });
+    }
+
+    if (opts.status) {
+      await prisma.exceptionCase.update({
+        where: { id: exceptionCase.id },
+        data: { status: opts.status, resolvedAt: opts.status === "RESOLVED" ? new Date() : null },
+      });
+    }
+  }
+
+  for (const paymentId of scenarioPaymentIds.missingSettlement) {
+    await annotateException(paymentId, {
+      comments: [{ author: pick(rng, opsAnalysts).name, body: "Checked latest settlement batch — no matching reference found. Escalating to scheme operations." }],
+      withEvidence: true,
+      status: "IN_PROGRESS",
+    });
+  }
+  for (const paymentId of scenarioPaymentIds.amountMismatch) {
+    await annotateException(paymentId, {
+      comments: [{ author: pick(rng, opsAnalysts).name, body: "Confirmed discrepancy against source settlement file. Requesting correction from scheme." }],
+      withEvidence: true,
+    });
+  }
+  for (const paymentId of scenarioPaymentIds.currencyMismatch) {
+    await annotateException(paymentId, {
+      comments: [{ author: pick(rng, opsAnalysts).name, body: "Likely a file-processing error at the settlement provider — raised with their support desk." }],
+    });
+  }
+  for (const paymentId of scenarioPaymentIds.duplicate) {
+    await annotateException(paymentId, {
+      comments: [{ author: pick(rng, opsAnalysts).name, body: "Confirmed with customer service — customer confirms only one purchase was intended. Reversal requested." }],
+      withEvidence: true,
+    });
+  }
+  for (const [index, paymentId] of scenarioPaymentIds.delayedSettlement.entries()) {
+    await annotateException(paymentId, {
+      comments: [{ author: pick(rng, opsAnalysts).name, body: "Settlement has now been received; monitoring provider for recurrence." }],
+      withEvidence: true,
+      status: index === 0 ? "RESOLVED" : undefined,
+    });
+  }
+  for (const paymentId of scenarioPaymentIds.stuckPayment) {
+    await annotateException(paymentId, {
+      comments: [{ author: pick(rng, opsAnalysts).name, body: "Escalated to processing provider for status update." }],
+    });
+  }
+  for (const paymentId of scenarioPaymentIds.invalidStatusCombination) {
+    await annotateException(paymentId, {
+      comments: [{ author: pick(rng, opsAnalysts).name, body: "Data-integrity issue — investigating with the settlement provider how a completed settlement was filed against this payment." }],
+      withEvidence: true,
     });
   }
 
-  // 6. UAT test cases + executions + evidence.
+  // 7. UAT test cases + executions + evidence.
   const uatDefs = [
     { area: "Payments", title: "Payments list loads with all required columns", expectedResult: "Reference, customer, amount, currency, method, status, settlement status, created and expected settlement date are all visible." },
     { area: "Payments", title: "Status filter narrows the payments list", expectedResult: "Selecting a payment status returns only payments with that status." },
-    { area: "Reconciliation", title: "Settlement-status filter reflects derived reconciliation outcome", expectedResult: "Filtering by settlement status matches the badge shown per row." },
+    { area: "Reconciliation", title: "Running reconciliation produces a completed run summary", expectedResult: "Run status, counts by rule and severity, and exceptions created are all displayed." },
     { area: "Payments", title: "Currency filter restricts results to selected currency", expectedResult: "Only EUR or only GBP payments are shown as selected." },
     { area: "Payments", title: "Search by payment reference returns exact match", expectedResult: "Entering a payment reference returns exactly that payment." },
-    { area: "Payments", title: "Search by customer reference returns expected payments", expectedResult: "All payments for the matching customer reference are returned." },
+    { area: "Exceptions", title: "Exceptions list filters by type, severity, status and SLA state", expectedResult: "Each filter narrows the list to matching exception cases." },
     { area: "Payments", title: "Payment detail shows settlement information when present", expectedResult: "Settlement reference, amount, status and settled date are displayed." },
     { area: "Payments", title: "Payment detail shows empty state when no settlement exists", expectedResult: "A clear explanatory empty state is shown instead of blank space." },
-    { area: "Reconciliation", title: "SLA breach is surfaced for pending payments past expected settlement date", expectedResult: "Payment shows a MISSING or breach-related settlement status badge." },
+    { area: "Reconciliation", title: "Re-running reconciliation does not duplicate open exceptions", expectedResult: "The same unresolved issue links to its existing exception rather than creating a new one." },
     { area: "Settlements", title: "Settlements list links back to the correct payment detail page", expectedResult: "Clicking a settlement row navigates to the linked payment's detail page." },
   ] as const;
 
@@ -492,7 +467,6 @@ async function main() {
   console.log(`  Customers: ${customers.length}`);
   console.log(`  Payments: ${createdPayments.length}`);
   console.log(`  Settlements: ${createdPayments.filter((p) => p.settlement).length}`);
-  console.log(`  Reconciliation run: ${run.runReference} (${matchedCount} matched / ${results.length - matchedCount} exceptions)`);
   console.log(`  UAT test cases: ${uatDefs.length}`);
 }
 

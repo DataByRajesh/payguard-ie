@@ -2,15 +2,21 @@ import { describe, expect, it } from "vitest";
 import {
   ExceptionSeverity,
   ExceptionStatus,
+  ExceptionType,
   PaymentStatus,
+  ReconciliationRunStatus,
   SettlementStatus,
   UATStatus,
 } from "@/app/generated/prisma/enums";
 import { SETTLEMENT_DISPLAY_STATUSES } from "@/lib/reconciliation";
+import { RULE_TYPES } from "@/lib/reconciliation-engine/types";
 import {
   EXCEPTION_SEVERITY_PRESENTATION,
   EXCEPTION_STATUS_PRESENTATION,
+  EXCEPTION_TYPE_PRESENTATION,
   PAYMENT_STATUS_PRESENTATION,
+  RECONCILIATION_RULE_TYPE_PRESENTATION,
+  RECONCILIATION_RUN_STATUS_PRESENTATION,
   SETTLEMENT_DISPLAY_STATUS_PRESENTATION,
   SETTLEMENT_STATUS_PRESENTATION,
   UAT_STATUS_PRESENTATION,
@@ -59,6 +65,24 @@ describe("status presentation config", () => {
   it("has a label and valid tone for every UATStatus value", () => {
     for (const value of Object.values(UATStatus)) {
       expectValidPresentation(UAT_STATUS_PRESENTATION[value], value);
+    }
+  });
+
+  it("has a label and valid tone for every ExceptionType value", () => {
+    for (const value of Object.values(ExceptionType)) {
+      expectValidPresentation(EXCEPTION_TYPE_PRESENTATION[value], value);
+    }
+  });
+
+  it("has a label and valid tone for every ReconciliationRunStatus value", () => {
+    for (const value of Object.values(ReconciliationRunStatus)) {
+      expectValidPresentation(RECONCILIATION_RUN_STATUS_PRESENTATION[value], value);
+    }
+  });
+
+  it("has a label and valid tone for every reconciliation rule type", () => {
+    for (const value of RULE_TYPES) {
+      expectValidPresentation(RECONCILIATION_RULE_TYPE_PRESENTATION[value], value);
     }
   });
 });
