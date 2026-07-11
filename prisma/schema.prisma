@@ -32,6 +32,7 @@ enum ExceptionType {
   MISSING_SETTLEMENT
   DELAYED_SETTLEMENT
   SLA_BREACH
+  INVALID_STATUS_COMBINATION
 }
 
 enum ExceptionSeverity {
@@ -42,10 +43,27 @@ enum ExceptionSeverity {
 }
 
 enum ExceptionStatus {
+  NEW
   OPEN
   IN_PROGRESS
   RESOLVED
   CLOSED
+}
+
+enum ReconciliationRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum ReconciliationRuleType {
+  MISSING_SETTLEMENT
+  AMOUNT_MISMATCH
+  CURRENCY_MISMATCH
+  DUPLICATE_PAYMENT
+  DELAYED_SETTLEMENT
+  STUCK_PAYMENT
+  INVALID_STATUS_COMBINATION
 }
 
 enum UATStatus {
@@ -111,49 +129,74 @@ model Settlement {
 }
 
 model ReconciliationRun {
-  id             String   @id @default(cuid())
-  runReference   String   @unique
-  runAt          DateTime @default(now())
-  totalPayments  Int
-  matchedCount   Int
-  exceptionCount Int
+  id                String                  @id @default(cuid())
+  runReference      String                  @unique
+  status            ReconciliationRunStatus
+  startedAt         DateTime                @default(now())
+  completedAt       DateTime?
+  totalPayments     Int
+  totalSettlements  Int
+  totalResults      Int
+  passedCount       Int
+  failedCount       Int
+  exceptionsCreated Int
+  countsByRule      String
+  countsBySeverity  String
+  errorMessage      String?
 
   results ReconciliationResult[]
 }
 
 model ReconciliationResult {
-  id                  String            @id @default(cuid())
+  id                  String                 @id @default(cuid())
   reconciliationRunId String
-  reconciliationRun   ReconciliationRun @relation(fields: [reconciliationRunId], references: [id])
+  reconciliationRun   ReconciliationRun      @relation(fields: [reconciliationRunId], references: [id])
   paymentId           String
-  payment             Payment           @relation(fields: [paymentId], references: [id])
+  payment             Payment                @relation(fields: [paymentId], references: [id])
   settlementId        String?
-  settlement          Settlement?       @relation(fields: [settlementId], references: [id])
-  outcome             String
-  notes               String?
-  createdAt           DateTime          @default(now())
+  settlement          Settlement?            @relation(fields: [settlementId], references: [id])
+  ruleType            ReconciliationRuleType
+  passed              Boolean
+  severity            ExceptionSeverity?
+  summary             String
+  expectedValue       String?
+  actualValue         String?
+  differenceMinor     Int?
+  metadata            String?
+  exceptionCaseId     String?
+  exceptionCase       ExceptionCase?         @relation(fields: [exceptionCaseId], references: [id])
+  createdAt           DateTime               @default(now())
 
   @@index([paymentId])
+  @@index([reconciliationRunId])
+  @@index([exceptionCaseId])
 }
 
 model ExceptionCase {
-  id            String            @id @default(cuid())
-  caseReference String            @unique
-  paymentId     String
-  payment       Payment           @relation(fields: [paymentId], references: [id])
-  type          ExceptionType
-  severity      ExceptionSeverity
-  status        ExceptionStatus
-  title         String
-  description   String
-  assignedTo    String?
-  openedAt      DateTime          @default(now())
-  resolvedAt    DateTime?
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  id             String            @id @default(cuid())
+  caseReference  String            @unique
+  paymentId      String
+  payment        Payment           @relation(fields: [paymentId], references: [id])
+  type           ExceptionType
+  severity       ExceptionSeverity
+  status         ExceptionStatus
+  title          String
+  description    String
+  assignedTo     String?
+  dedupeKey      String
+  lastDetectedAt DateTime          @default(now())
+  slaDeadline    DateTime?
+  source         String            @default("MANUAL")
+  openedAt       DateTime          @default(now())
+  resolvedAt     DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
-  comments        ExceptionComment[]
-  evidenceRecords EvidenceRecord[]
+  comments              ExceptionComment[]
+  evidenceRecords       EvidenceRecord[]
+  reconciliationResults ReconciliationResult[]
+
+  @@index([dedupeKey])
 }
 
 model ExceptionComment {
