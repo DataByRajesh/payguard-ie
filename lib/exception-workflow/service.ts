@@ -7,7 +7,6 @@ import {
   createExceptionEvidence,
   createNote,
   getExceptionCaseForMutation,
-  nextEvidenceReference,
   updateExceptionWithVersionCheck,
 } from "./persistence";
 import type { ExceptionStatusValue } from "./types";
@@ -44,6 +43,10 @@ export async function assignException(
 ) {
   const exceptionCase = await requireException(exceptionId);
   const status = exceptionCase.status as ExceptionStatusValue;
+
+  if (status === "RESOLVED" || status === "CLOSED") {
+    throw new DomainValidationError(["A resolved or closed case cannot be assigned or reassigned."]);
+  }
 
   let newStatus: ExceptionStatusValue = status;
   if (status === "NEW") {
@@ -277,13 +280,11 @@ export async function addEvidenceToException(
   },
 ) {
   await requireException(exceptionId);
-  const evidenceRef = await nextEvidenceReference();
 
   return prisma.$transaction(async (tx) => {
     const updated = await updateExceptionWithVersionCheck(tx, exceptionId, params.expectedVersion, {});
     const evidence = await createExceptionEvidence(tx, {
       exceptionCaseId: exceptionId,
-      evidenceRef,
       type: params.evidenceType,
       title: params.title,
       description: params.description,

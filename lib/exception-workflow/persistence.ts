@@ -67,11 +67,15 @@ export async function createNote(
   });
 }
 
+/**
+ * Generates the next evidence reference and creates the record inside the same transaction —
+ * both must happen atomically (not a separate pre-transaction count()) so two concurrent evidence
+ * adds can never compute the same reference and collide against the column's unique constraint.
+ */
 export async function createExceptionEvidence(
   tx: Prisma.TransactionClient,
   params: {
     exceptionCaseId: string;
-    evidenceRef: string;
     type: string;
     title: string;
     description: string | null;
@@ -80,10 +84,12 @@ export async function createExceptionEvidence(
     createdAt: Date;
   },
 ) {
+  const count = await tx.evidenceRecord.count();
+  const evidenceRef = `EVD-${String(count + 1).padStart(6, "0")}`;
   return tx.evidenceRecord.create({
     data: {
       exceptionCaseId: params.exceptionCaseId,
-      evidenceRef: params.evidenceRef,
+      evidenceRef,
       type: params.type as never,
       title: params.title,
       description: params.description,
@@ -93,9 +99,4 @@ export async function createExceptionEvidence(
       createdAt: params.createdAt,
     },
   });
-}
-
-export async function nextEvidenceReference(): Promise<string> {
-  const count = await prisma.evidenceRecord.count();
-  return `EVD-${String(count + 1).padStart(6, "0")}`;
 }

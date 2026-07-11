@@ -11,11 +11,6 @@ async function createAuditEvent(entityId: string, action: string, summary: strin
   await prisma.auditEvent.create({ data: { entityType: "UAT_EXECUTION", entityId, action, summary, actor, createdAt } });
 }
 
-async function nextEvidenceReference(): Promise<string> {
-  const count = await prisma.evidenceRecord.count();
-  return `EVD-${String(count + 1).padStart(6, "0")}`;
-}
-
 /**
  * Records a new execution for a test case. Deliberately never auto-creates an ExceptionCase —
  * a failed execution may only be *manually* linked to an existing one (linkedExceptionCaseId),
@@ -72,19 +67,25 @@ export async function addUatEvidence(params: {
   const execution = await prisma.uATExecution.findUnique({ where: { id: params.executionId } });
   if (!execution) throw new UatTestCaseNotFoundError(params.executionId);
 
-  const evidenceRef = await nextEvidenceReference();
-  const evidence = await prisma.evidenceRecord.create({
-    data: {
-      uatExecutionId: params.executionId,
-      evidenceRef,
-      type: params.evidenceType as never,
-      title: params.title,
-      description: params.description,
-      fileReference: params.fileReference,
-      addedByUserId: params.addedByUserId,
-      capturedAt: params.now,
-      createdAt: params.now,
-    },
+  // The reference count-then-create must happen inside one transaction — otherwise two
+  // concurrent evidence adds (e.g. one from the UAT workspace, one from the exception workspace)
+  // could read the same count and collide on the column's unique constraint.
+  const evidence = await prisma.$transaction(async (tx) => {
+    const count = await tx.evidenceRecord.count();
+    const evidenceRef = `EVD-${String(count + 1).padStart(6, "0")}`;
+    return tx.evidenceRecord.create({
+      data: {
+        uatExecutionId: params.executionId,
+        evidenceRef,
+        type: params.evidenceType as never,
+        title: params.title,
+        description: params.description,
+        fileReference: params.fileReference,
+        addedByUserId: params.addedByUserId,
+        capturedAt: params.now,
+        createdAt: params.now,
+      },
+    });
   });
 
   await createAuditEvent(params.executionId, "UAT_EVIDENCE_ADDED", `${params.actorName} added evidence (${evidence.evidenceRef}).`, params.actorName, params.now);

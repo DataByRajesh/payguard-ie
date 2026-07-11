@@ -526,13 +526,14 @@ async function main() {
 
     const status = executionPlan[i];
     const isLastFail = i === executionPlan.length - 1 && status === "FAIL";
+    const tester = pick(rng, [...uatLeads, ...appSupport]);
     const execution = await executeUatCase({
       testCaseId: testCase.id,
       status,
       actualResult: status === "PASS" ? def.expectedResult : status === "FAIL" ? "Result did not match expectation — see linked exception or evidence." : null,
       notes: status === "BLOCKED" ? "Blocked pending environment fix." : null,
-      testerUserId: pick(rng, [...uatLeads, ...appSupport]).id,
-      testerName: pick(rng, [...uatLeads, ...appSupport]).name,
+      testerUserId: tester.id,
+      testerName: tester.name,
       linkedExceptionCaseId: isLastFail ? linkedExceptionId : null,
       now: status === "NOT_RUN" ? now : daysAgo(randomInt(rng, 1, 10), now),
     });
@@ -545,8 +546,8 @@ async function main() {
         title: `${testCase.testCaseRef} execution evidence`,
         description: `Captured evidence for the ${status} execution of ${testCase.testCaseRef}.`,
         fileReference: `/evidence/${testCase.testCaseRef.toLowerCase()}-${status.toLowerCase()}.png`,
-        addedByUserId: execution.testerUserId ?? pick(rng, uatLeads).id,
-        actorName: pick(rng, uatLeads).name,
+        addedByUserId: tester.id,
+        actorName: tester.name,
         now: execution.executedAt ?? now,
       });
     }
