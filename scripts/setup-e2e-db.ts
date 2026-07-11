@@ -5,7 +5,10 @@ import path from "node:path";
 
 config({ path: path.resolve(__dirname, "../.env.test") });
 
-const env = { ...process.env };
+// `.env.test` is a gitignored, optional local override — on a fresh clone it won't exist, and
+// without this fallback `env.DATABASE_URL` would be undefined here, silently letting Prisma fall
+// back to whatever `.env` points at (the interactive dev database) instead of the disposable one.
+const env = { ...process.env, DATABASE_URL: process.env.DATABASE_URL ?? "file:./prisma/test.db" };
 
 // The test database is a disposable fixture, never real data — always start it from a clean
 // file so schema migrations never have to reconcile against a previous test run's rows.
