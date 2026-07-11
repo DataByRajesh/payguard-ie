@@ -2,10 +2,11 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PaymentSummaryCard } from "@/components/payments/PaymentSummaryCard";
-import { PaymentTimelinePlaceholder } from "@/components/payments/PaymentTimelinePlaceholder";
 import { ReconciliationResultsPanel } from "@/components/payments/ReconciliationResultsPanel";
 import { ExceptionCasePanel } from "@/components/payments/ExceptionCasePanel";
+import { AuditTimeline } from "@/components/exceptions/AuditTimeline";
 import { getPaymentById } from "@/lib/queries/payments";
+import { getAuditEventsForEntity } from "@/lib/queries/audit";
 
 interface PaymentDetailPageProps {
   params: Promise<{ id: string }>;
@@ -18,6 +19,8 @@ export default async function PaymentDetailPage({ params }: PaymentDetailPagePro
   if (!payment) {
     notFound();
   }
+
+  const auditEvents = await getAuditEventsForEntity("PAYMENT", payment.id);
 
   return (
     <div className="flex flex-col gap-6">
@@ -38,9 +41,9 @@ export default async function PaymentDetailPage({ params }: PaymentDetailPagePro
         settlement={payment.settlement}
         settlementDisplayStatus={payment.settlementDisplayStatus}
       />
-      <PaymentTimelinePlaceholder />
       <ReconciliationResultsPanel results={payment.reconciliationResults} />
       <ExceptionCasePanel exceptionCases={payment.exceptionCases} />
+      <AuditTimeline events={auditEvents} />
     </div>
   );
 }

@@ -25,6 +25,12 @@ export async function AppShell({ children }: { children: ReactNode }) {
             <span className="text-sm font-semibold tracking-wide text-slate-900">
               PayGuard <span className="text-slate-400">IE</span>
             </span>
+            <span
+              title="All data in this environment is synthetic — no real customers, payments or bank connectivity."
+              className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800"
+            >
+              Demo data
+            </span>
             <nav aria-label="Primary" className="flex flex-wrap gap-1">
               {NAV_ITEMS.map((item) => (
                 <NavLink key={item.href} href={item.href} label={item.label} />

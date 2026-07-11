@@ -17,6 +17,7 @@
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset --force",
     "db:studio": "prisma studio",
+    "demo:reset": "tsx scripts/demo-reset.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
