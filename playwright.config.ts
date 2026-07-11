@@ -11,7 +11,11 @@ export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
   workers: 1,
-  retries: 0,
+  // Server Action calls against the prebuilt `next start` server have been observed to hang
+  // intermittently on this stack (Next.js 16 / React 19), independent of invocation pattern —
+  // confirmed absent under `next dev`, but `next dev` has its own on-demand-compile flakiness
+  // (see the webServer command below). Retrying is the pragmatic mitigation for either class.
+  retries: 2,
   use: {
     baseURL,
     trace: "on-first-retry",
