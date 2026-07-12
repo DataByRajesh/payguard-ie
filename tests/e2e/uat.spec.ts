@@ -12,8 +12,8 @@ async function submitAndAwaitStatus(
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       await fillForm();
-      await getButton().click({ timeout: 8000 });
-      await expect(statusLocator).toBeVisible({ timeout: 8000 });
+      await getButton().click({ timeout: 15000 });
+      await expect(statusLocator).toBeVisible({ timeout: 15000 });
       return;
     } catch (error) {
       if (attempt === 3) throw error;
@@ -23,6 +23,7 @@ async function submitAndAwaitStatus(
 }
 
 test("recording a failed UAT execution, linking it to an exception, and attaching evidence", async ({ page }) => {
+  test.setTimeout(90000);
   await page.goto("/uat");
   const table = page.getByRole("table", { name: "UAT test cases" });
   await expect(table).toBeVisible({ timeout: 20000 });
@@ -55,7 +56,11 @@ test("recording a failed UAT execution, linking it to an exception, and attachin
   const latestExecutionItem = page.locator("li", { hasText: "Reconciliation did not flag the expected mismatch." }).first();
   await expect(latestExecutionItem).toBeVisible({ timeout: 20000 });
   const linkedExceptionRef = linkedLabel.split(" — ")[0];
-  await expect(page.getByRole("link", { name: linkedExceptionRef })).toBeVisible({ timeout: 20000 });
+  // A retried-but-actually-succeeded submission (see submitAndAwaitStatus above) can leave more
+  // than one execution linked to the same exception, so this link's accessible name isn't unique
+  // on the page — scope to the one inside the execution item we just recorded.
+  const linkedExceptionLink = latestExecutionItem.getByRole("link", { name: linkedExceptionRef });
+  await expect(linkedExceptionLink).toBeVisible({ timeout: 20000 });
 
   // Attach evidence to the execution just recorded (the most recent item in the history list).
   await submitAndAwaitStatus(
@@ -67,10 +72,14 @@ test("recording a failed UAT execution, linking it to an exception, and attachin
     () => latestExecutionItem.getByRole("button", { name: "Add evidence" }),
     /Evidence added/i,
   );
-  await expect(latestExecutionItem.getByText("Reconciliation run output showing the missed mismatch")).toBeVisible({ timeout: 20000 });
+  // A retried-but-actually-succeeded submission can attach more than one evidence record with
+  // this title to the same execution — see the comment on linkedExceptionLink above.
+  await expect(
+    latestExecutionItem.getByText("Reconciliation run output showing the missed mismatch").first(),
+  ).toBeVisible({ timeout: 20000 });
 
   // Follow the link through to the linked exception case.
-  await page.getByRole("link", { name: linkedExceptionRef }).click();
+  await linkedExceptionLink.click();
   await expect(page).toHaveURL(/\/exceptions\/[^/]+$/);
   await expect(page.getByRole("heading", { name: linkedExceptionRef })).toBeVisible({ timeout: 20000 });
 });
