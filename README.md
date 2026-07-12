@@ -5,6 +5,9 @@ An internal payments operations, reconciliation, exception-investigation and UAT
 - **Sprint 1**: project foundation plus fully functional Payments and Settlements areas.
 - **Sprint 2**: a deterministic reconciliation engine — seven rules evaluated against every payment/settlement, stored results, idempotent exception creation, and functional `/reconciliation` (+ run detail) and `/exceptions` (+ case detail) pages.
 - **Sprint 3**: the full exception investigation/resolution/approval workflow (assignment, typed notes, root-cause analysis, resolution, independent-review approval/rejection, SLA tracking, evidence, optimistic concurrency, full audit trail) and a UAT workspace (`/uat`, `/uat/[id]`) with manual-only exception linking.
+- **Sprint 4**: live `/reports` exports (Markdown/CSV/print-friendly HTML across four report types), a real audit timeline on `/payments/[id]` (retiring the last Sprint 1 placeholder), one-command demo reset (`npm run demo:reset`), and a full documentation pass.
+
+Per-sprint delivery detail: [SPRINT1_SUMMARY.md](SPRINT1_SUMMARY.md), [SPRINT2_SUMMARY.md](SPRINT2_SUMMARY.md), [SPRINT3_SUMMARY.md](SPRINT3_SUMMARY.md), [SPRINT4_SUMMARY.md](SPRINT4_SUMMARY.md). System-wide docs: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/DATA_MODEL.md](docs/DATA_MODEL.md), [docs/TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md), [docs/SECURITY_AND_LIMITATIONS.md](docs/SECURITY_AND_LIMITATIONS.md).
 
 Built with Next.js (App Router), TypeScript, Tailwind CSS, Prisma + SQLite, Zod, Vitest and Playwright. No AI features, external APIs, authentication or automatic payment submission are implemented.
 
@@ -48,6 +51,7 @@ Connection string lives in `.env` (`DATABASE_URL="file:./prisma/dev.db"`). See `
 | `npm test` | Run Vitest unit + integration tests once (provisions a disposable `prisma/vitest.db` first via the `pretest` script) |
 | `npm run test:watch` | Vitest in watch mode |
 | `npm run test:e2e` | Run the Playwright smoke suite against a prebuilt server and a separate `prisma/test.db` (auto-migrated and seeded first) |
+| `npm run demo:reset` | Wipe and re-seed `prisma/dev.db` back to the same deterministic demo dataset — safe to run any time, including after clicking around and mutating data |
 
 ## Architecture notes
 
@@ -85,6 +89,12 @@ The exceptions an engine run creates are no longer read-only: `/exceptions/[id]`
 - **Optimistic concurrency**: every exception case carries a `version` column. Every mutating form embeds the version it was loaded with; a second, stale submission (someone else changed it first) is rejected with a clear "reload and try again" message rather than silently overwriting.
 - **UAT workspace**: `/uat` (queue with pass/fail/blocked/not-run summary tiles) and `/uat/[id]` (test case detail, execution history, new-execution form). A failed execution **never** automatically creates an exception case — linking a UAT failure to an existing exception is always a manual, tester-driven choice. Full detail: **[docs/UAT_WORKFLOW.md](docs/UAT_WORKFLOW.md)**.
 - **Dashboard** now reflects live data across all three areas: exception counts (open/unassigned/overdue/due soon/awaiting approval/closed), UAT execution counts, and the latest reconciliation run.
+
+## Reports and demo mode (Sprint 4)
+
+`/reports` offers four live report types — Reconciliation Run Summary, Exception Queue Report, UAT Summary Report, Payments & Settlements Summary — each downloadable as Markdown, CSV, or viewed as a print-friendly HTML page (`/reports/[type]?format=markdown|csv|html`). Every figure is computed by calling the same query/service functions the interactive pages use (`lib/reports/data.ts`), so a report can never disagree with what's shown on screen. There is no scheduling, storage, or templating — reports are generated fresh from the current database state on every request.
+
+A permanent "Demo data" badge in the header makes clear this environment is synthetic. Run `npm run demo:reset` at any point to wipe and re-seed `prisma/dev.db` back to the same deterministic starting dataset, regardless of how much you've clicked around and mutated in between.
 
 ## Testing
 
