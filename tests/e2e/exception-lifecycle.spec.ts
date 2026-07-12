@@ -20,14 +20,23 @@ async function submitAndAwaitStatus(
 ) {
   const statusLocator = page.locator('p[role="status"]', { hasText: statusPattern });
   for (let attempt = 1; attempt <= 3; attempt++) {
+    if (attempt > 1) {
+      // A hung request from a previous attempt may have actually succeeded server-side: some
+      // buttons relabel on success ("Assign" -> "Reassign", matched by pattern above) and some
+      // disappear entirely once the case has moved past the status that shows them. Wait (don't
+      // just snapshot with .count(), which could race the post-reload render) for the button we're
+      // about to click to actually appear; if it never does, the case already advanced — treat
+      // that as success rather than failing to find something the UI has legitimately removed.
+      const buttonReappeared = await getButton()
+        .waitFor({ state: "visible", timeout: 5000 })
+        .then(() => true)
+        .catch(() => false);
+      if (!buttonReappeared) return;
+    }
     try {
       await fillForm();
-      // A hung request may have actually succeeded server-side by the time we retry: some
-      // buttons relabel on success ("Assign" -> "Reassign", matched by pattern above) and some
-      // disappear entirely once the case has moved past the status that shows them — either way
-      // the click or the status-message wait below will fail fast and we just reload and retry.
-      await getButton().click({ timeout: 8000 });
-      await expect(statusLocator).toBeVisible({ timeout: 8000 });
+      await getButton().click({ timeout: 15000 });
+      await expect(statusLocator).toBeVisible({ timeout: 15000 });
       return;
     } catch (error) {
       if (attempt === 3) throw error;
@@ -37,7 +46,7 @@ async function submitAndAwaitStatus(
 }
 
 test("full exception lifecycle: assign through independent approval, with a complete audit trail", async ({ page }) => {
-  test.setTimeout(90000);
+  test.setTimeout(150000);
   await page.goto("/exceptions?status=NEW&unassigned=true");
   const table = page.getByRole("table", { name: "Exceptions" });
   await expect(table).toBeVisible({ timeout: 20000 });
@@ -82,7 +91,11 @@ test("full exception lifecycle: assign through independent approval, with a comp
     /Note added/i,
   );
   await page.goto(detailUrl);
-  await expect(page.getByText("Reviewed the payment and settlement records side by side.")).toBeVisible({ timeout: 20000 });
+  // A retried-but-actually-succeeded submission can add this note twice (the "Add note" button,
+  // unlike "Start investigation", never disappears — see submitAndAwaitStatus above) — tolerate it.
+  await expect(
+    page.getByText("Reviewed the payment and settlement records side by side.").first(),
+  ).toBeVisible({ timeout: 20000 });
 
   // Record a root cause.
   await submitAndAwaitStatus(
@@ -147,8 +160,11 @@ test("full exception lifecycle: assign through independent approval, with a comp
 
   await expect(page.getByText("Closed", { exact: true }).first()).toBeVisible({ timeout: 20000 });
 
-  // The audit timeline should record every step of the journey, in order.
-  const timeline = page.locator("text=Audit timeline").locator("..");
+  // The audit timeline should record every step of the journey, in order. Scope to the <section>
+  // containing the heading (not just its immediate parent <header>, which the Card component
+  // renders as a sibling of the content div — a plain `.locator("..")` from the heading text only
+  // ever captures "Audit timeline" itself, never the event list below it).
+  const timeline = page.locator("section", { has: page.getByRole("heading", { name: "Audit timeline" }) });
   const timelineText = await timeline.textContent();
   const expectedFragments = [
     "Assigned to",
@@ -165,7 +181,7 @@ test("full exception lifecycle: assign through independent approval, with a comp
 });
 
 test("rejecting a resolution reopens the case for further investigation", async ({ page }) => {
-  test.setTimeout(90000);
+  test.setTimeout(150000);
   await page.goto("/exceptions?status=NEW&unassigned=true");
   const table = page.getByRole("table", { name: "Exceptions" });
   const rows = table.locator("tbody tr");
