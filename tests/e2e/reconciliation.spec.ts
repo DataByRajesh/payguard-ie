@@ -5,8 +5,10 @@ test("running reconciliation, drilling into a result/exception, and re-running i
   await expect(page.getByRole("heading", { name: "Reconciliation" })).toBeVisible();
 
   // The seed database already ran reconciliation once; this is a second, manually-triggered run.
+  // ~350 sequential per-rule writes (see RECONCILIATION_RULES.md's partial-write trade-off) against
+  // Postgres take measurably longer than the same run did against SQLite's in-process writes.
   await page.getByRole("button", { name: "Run reconciliation" }).click();
-  await expect(page.locator('p[role="status"]')).toContainText(/completed:/i, { timeout: 15000 });
+  await expect(page.locator('p[role="status"]')).toContainText(/completed:/i, { timeout: 30000 });
   await page.waitForLoadState("networkidle");
 
   const runsTable = page.getByRole("table", { name: "Reconciliation runs" });

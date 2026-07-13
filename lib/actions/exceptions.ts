@@ -13,6 +13,7 @@ import {
   transitionExceptionSchema,
 } from "@/lib/validation/exceptionWorkflow";
 import { formDataToObject, mapWorkflowError, type ActionResult } from "./helpers";
+import { isDemoReadOnly, demoReadOnlyResult } from "@/lib/demo-mode";
 import * as exceptionWorkflow from "@/lib/exception-workflow/service";
 
 function revalidateExceptionPaths(exceptionId: string) {
@@ -22,6 +23,7 @@ function revalidateExceptionPaths(exceptionId: string) {
 }
 
 export async function assignExceptionAction(formData: FormData): Promise<ActionResult> {
+  if (isDemoReadOnly()) return demoReadOnlyResult();
   try {
     const input = assignExceptionSchema.parse(formDataToObject(formData));
     const actor = await getActingUser();
@@ -48,6 +50,7 @@ export async function assignExceptionAction(formData: FormData): Promise<ActionR
 }
 
 export async function startInvestigationAction(formData: FormData): Promise<ActionResult> {
+  if (isDemoReadOnly()) return demoReadOnlyResult();
   try {
     const input = transitionExceptionSchema.parse(formDataToObject(formData));
     const actor = await getActingUser();
@@ -60,6 +63,7 @@ export async function startInvestigationAction(formData: FormData): Promise<Acti
 }
 
 export async function requestInformationAction(formData: FormData): Promise<ActionResult> {
+  if (isDemoReadOnly()) return demoReadOnlyResult();
   try {
     const input = transitionExceptionSchema.parse(formDataToObject(formData));
     const actor = await getActingUser();
@@ -72,6 +76,7 @@ export async function requestInformationAction(formData: FormData): Promise<Acti
 }
 
 export async function resumeInvestigationAction(formData: FormData): Promise<ActionResult> {
+  if (isDemoReadOnly()) return demoReadOnlyResult();
   try {
     const input = transitionExceptionSchema.parse(formDataToObject(formData));
     const actor = await getActingUser();
@@ -84,6 +89,7 @@ export async function resumeInvestigationAction(formData: FormData): Promise<Act
 }
 
 export async function addNoteAction(formData: FormData): Promise<ActionResult> {
+  if (isDemoReadOnly()) return demoReadOnlyResult();
   try {
     const input = addNoteSchema.parse(formDataToObject(formData));
     const actor = await getActingUser();
@@ -103,6 +109,7 @@ export async function addNoteAction(formData: FormData): Promise<ActionResult> {
 }
 
 export async function recordRootCauseAction(formData: FormData): Promise<ActionResult> {
+  if (isDemoReadOnly()) return demoReadOnlyResult();
   try {
     const input = recordRootCauseSchema.parse(formDataToObject(formData));
     const actor = await getActingUser();
@@ -122,6 +129,7 @@ export async function recordRootCauseAction(formData: FormData): Promise<ActionR
 }
 
 export async function submitResolutionAction(formData: FormData): Promise<ActionResult> {
+  if (isDemoReadOnly()) return demoReadOnlyResult();
   try {
     const input = submitResolutionSchema.parse(formDataToObject(formData));
     const actor = await getActingUser();
@@ -141,6 +149,7 @@ export async function submitResolutionAction(formData: FormData): Promise<Action
 }
 
 export async function approveExceptionAction(formData: FormData): Promise<ActionResult> {
+  if (isDemoReadOnly()) return demoReadOnlyResult();
   try {
     const input = reviewExceptionSchema.parse(formDataToObject(formData));
     const actor = await getActingUser();
@@ -159,6 +168,7 @@ export async function approveExceptionAction(formData: FormData): Promise<Action
 }
 
 export async function rejectExceptionAction(formData: FormData): Promise<ActionResult> {
+  if (isDemoReadOnly()) return demoReadOnlyResult();
   try {
     const input = reviewExceptionSchema.parse(formDataToObject(formData));
     const actor = await getActingUser();
@@ -177,6 +187,7 @@ export async function rejectExceptionAction(formData: FormData): Promise<ActionR
 }
 
 export async function addExceptionEvidenceAction(formData: FormData): Promise<ActionResult> {
+  if (isDemoReadOnly()) return demoReadOnlyResult();
   try {
     const input = addExceptionEvidenceSchema.parse(formDataToObject(formData));
     const actor = await getActingUser();

@@ -12,8 +12,8 @@ async function submitAndAwaitStatus(
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       await fillForm();
-      await getButton().click({ timeout: 15000 });
-      await expect(statusLocator).toBeVisible({ timeout: 15000 });
+      await getButton().click({ timeout: 20000 });
+      await expect(statusLocator).toBeVisible({ timeout: 20000 });
       return;
     } catch (error) {
       if (attempt === 3) throw error;
@@ -23,7 +23,7 @@ async function submitAndAwaitStatus(
 }
 
 test("recording a failed UAT execution, linking it to an exception, and attaching evidence", async ({ page }) => {
-  test.setTimeout(90000);
+  test.setTimeout(120000);
   await page.goto("/uat");
   const table = page.getByRole("table", { name: "UAT test cases" });
   await expect(table).toBeVisible({ timeout: 20000 });

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { runReconciliation, ReconciliationAlreadyRunningError } from "@/lib/reconciliation-engine/service";
+import { isDemoReadOnly, demoReadOnlyResult } from "@/lib/demo-mode";
 
 const runReconciliationInputSchema = z.object({});
 
@@ -13,6 +14,7 @@ export interface RunReconciliationActionResult {
 }
 
 export async function runReconciliationAction(): Promise<RunReconciliationActionResult> {
+  if (isDemoReadOnly()) return demoReadOnlyResult();
   runReconciliationInputSchema.parse({});
 
   try {

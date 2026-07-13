@@ -5,8 +5,10 @@ import { getActingUser } from "@/lib/acting-user";
 import { addUatEvidenceSchema, executeUatCaseSchema } from "@/lib/validation/uat";
 import { executeUatCase, addUatEvidence } from "@/lib/uat-workflow/service";
 import { formDataToObject, mapWorkflowError, type ActionResult } from "./helpers";
+import { isDemoReadOnly, demoReadOnlyResult } from "@/lib/demo-mode";
 
 export async function executeUatCaseAction(formData: FormData): Promise<ActionResult> {
+  if (isDemoReadOnly()) return demoReadOnlyResult();
   try {
     const input = executeUatCaseSchema.parse(formDataToObject(formData));
     const actor = await getActingUser();
@@ -34,6 +36,7 @@ export async function executeUatCaseAction(formData: FormData): Promise<ActionRe
 }
 
 export async function addUatEvidenceAction(formData: FormData): Promise<ActionResult> {
+  if (isDemoReadOnly()) return demoReadOnlyResult();
   try {
     const input = addUatEvidenceSchema.parse(formDataToObject(formData));
     const actor = await getActingUser();
