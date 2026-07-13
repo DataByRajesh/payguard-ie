@@ -1,0 +1,23 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: payguard-ie-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: payguard
+      POSTGRES_PASSWORD: payguard
+      POSTGRES_DB: payguard_dev
+    ports:
+      # Only bound to localhost — never exposed beyond this machine.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - payguard_pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init-additional-databases.sh:/docker-entrypoint-initdb.d/init-additional-databases.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payguard -d payguard_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  payguard_pgdata:

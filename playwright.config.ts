@@ -28,7 +28,7 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
     env: {
-      DATABASE_URL: process.env.DATABASE_URL ?? "file:./prisma/test.db",
+      DATABASE_URL: process.env.DATABASE_URL ?? "postgresql://payguard:payguard@localhost:5432/payguard_test",
     },
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],

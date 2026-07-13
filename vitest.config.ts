@@ -6,7 +6,7 @@ export default defineConfig({
     environment: "node",
     include: ["lib/**/*.test.ts"],
     env: {
-      DATABASE_URL: "file:./prisma/vitest.db",
+      DATABASE_URL: "postgresql://payguard:payguard@localhost:5432/payguard_vitest",
     },
   },
   resolve: {

@@ -1,14 +1,14 @@
 # Testing Strategy
 
-Three layers, each targeting a different class of bug, against **three separate SQLite database files** so no test suite ever touches another suite's data — or the interactive dev database.
+Three layers, each targeting a different class of bug, against **three isolated Postgres databases** inside the same local Docker Compose instance (see [LOCAL_POSTGRES_SETUP.md](LOCAL_POSTGRES_SETUP.md)) so no test suite ever touches another suite's data — or the interactive dev database.
 
-| Database file | Used by | Provisioned by |
+| Database | Used by | Provisioned by |
 | --- | --- | --- |
-| `prisma/dev.db` | `npm run dev`, manual testing, `npm run demo:reset` | `npm run db:migrate` / `db:seed` |
-| `prisma/vitest.db` | Vitest (unit + service-integration) | `scripts/setup-vitest-db.ts` (the `pretest` script) |
-| `prisma/test.db` | Playwright | `scripts/setup-e2e-db.ts` (the `pretest:e2e` script) |
+| `payguard_dev` | `pnpm dev`, manual testing, `pnpm demo:reset` | `pnpm db:migrate` / `db:seed` |
+| `payguard_vitest` | Vitest (unit + service-integration) | `scripts/setup-vitest-db.ts` (the `pretest` script) |
+| `payguard_test` | Playwright | `scripts/setup-e2e-db.ts` (the `pretest:e2e` script) |
 
-All three setup scripts follow the same idiom: delete any stale SQLite file (including its `-journal`/`-wal`/`-shm` sidecars) and run `prisma migrate deploy` fresh, so every test run starts from a clean, migrated schema regardless of what a previous run left behind. The `.env.vitest`/`.env.test` files they load are gitignored, optional local overrides — on a fresh clone, `DATABASE_URL` falls back to the file paths above rather than silently inheriting `.env`'s `dev.db` connection string.
+All three setup scripts follow the same idiom: drop and recreate the `public` schema (`scripts/reset-postgres-schema.ts`) and run `prisma migrate deploy` fresh, so every test run starts from a clean, migrated schema regardless of what a previous run left behind. The `.env.vitest`/`.env.test` files they load are gitignored, optional local overrides — on a fresh clone, `DATABASE_URL` falls back to the local Postgres connection strings above rather than silently inheriting `.env`'s dev-database connection string.
 
 ## Unit tests (Vitest, `lib/**/*.test.ts`)
 
@@ -16,11 +16,11 @@ Pure-function tests against the domain layers — no database, no mocking, `envi
 
 ## Service-layer integration tests (Vitest, `lib/exception-workflow/service.test.ts`)
 
-The one place Vitest talks to a real database (`prisma/vitest.db`) rather than mocking Prisma — because the behaviour under test (optimistic-concurrency conflicts on `version`, transactional audit-event writes, the full assign→investigate→root-cause→resolve→evidence→approve path producing a real audit trail, reviewer-separation/evidence/root-cause validation, reject-and-reopen) only actually exists at the Prisma boundary; mocking Prisma here would just be re-testing the mock.
+The one place Vitest talks to a real database (`payguard_vitest`) rather than mocking Prisma — because the behaviour under test (optimistic-concurrency conflicts on `version`, transactional audit-event writes, the full assign→investigate→root-cause→resolve→evidence→approve path producing a real audit trail, reviewer-separation/evidence/root-cause validation, reject-and-reopen) only actually exists at the Prisma boundary; mocking Prisma here would just be re-testing the mock.
 
 ## End-to-end tests (Playwright, `tests/e2e/*.spec.ts`)
 
-Full-browser journeys against a prebuilt `next start` server (`playwright.config.ts`) on a dedicated port (3100) and `prisma/test.db`:
+Full-browser journeys against a prebuilt `next start` server (`playwright.config.ts`) on a dedicated port (3100) and the `payguard_test` database:
 
 - `smoke.spec.ts` — dashboard navigation, payments list + status filter round-trip, payment detail navigation, settlements list rendering.
 - `reconciliation.spec.ts` — run reconciliation, open the run detail, follow a result to its linked exception, re-run and confirm no duplicate open exceptions, exceptions-list filtering.
@@ -38,10 +38,10 @@ Full-browser journeys against a prebuilt `next start` server (`playwright.config
 ## Running everything
 
 ```bash
-npm run lint        # ESLint
-npm run typecheck   # tsc --noEmit
-npm test            # Vitest unit + service-integration (pretest provisions prisma/vitest.db)
-npm run test:e2e    # Playwright (pretest:e2e provisions prisma/test.db, builds, and starts the server)
+pnpm lint        # ESLint
+pnpm typecheck   # tsc --noEmit
+pnpm test        # Vitest unit + service-integration (pretest provisions payguard_vitest)
+pnpm test:e2e    # Playwright (pretest:e2e provisions payguard_test, builds, and starts the server)
 ```
 
 All four are run before every sprint's work is considered complete; see the per-sprint summaries (e.g. [SPRINT1_SUMMARY.md](../SPRINT1_SUMMARY.md)) for the "verification" record at the point each sprint was delivered.

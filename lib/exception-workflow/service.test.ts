@@ -15,8 +15,8 @@ import {
 } from "./service";
 
 /**
- * These specs exercise the real service + persistence layers against a disposable SQLite
- * database (provisioned by `npm run pretest` / scripts/setup-vitest-db.ts), not mocks — the
+ * These specs exercise the real service + persistence layers against a disposable Postgres
+ * database (provisioned by the `pretest` script / scripts/setup-vitest-db.ts), not mocks — the
  * behaviour under test (optimistic-concurrency conflicts, audit-event writes, transactional
  * atomicity) only exists at the Prisma boundary, so pure-function unit tests can't cover it.
  */
