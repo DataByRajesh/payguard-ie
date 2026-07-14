@@ -15,6 +15,7 @@ import {
 import { formDataToObject, mapWorkflowError, type ActionResult } from "./helpers";
 import { isDemoReadOnly, demoReadOnlyResult } from "@/lib/demo-mode";
 import { requirePermission } from "@/lib/auth/permissions";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { uploadEvidenceFileIfPresent } from "@/lib/evidence-storage/upload";
 import * as exceptionWorkflow from "@/lib/exception-workflow/service";
 
@@ -31,6 +32,8 @@ export async function assignExceptionAction(formData: FormData): Promise<ActionR
     const actor = await getActingUser();
     const denial = requirePermission<ActionResult>(actor, "EXCEPTION_ASSIGN");
     if (denial) return denial;
+    const rateLimited = await checkRateLimit<ActionResult>(actor.id, "assignException");
+    if (rateLimited) return rateLimited;
     const assignee = await prisma.user.findUnique({ where: { id: input.assignToUserId } });
     if (!assignee || !assignee.isActive) {
       return { success: false, message: "The selected user is inactive or does not exist." };
@@ -61,6 +64,8 @@ export async function startInvestigationAction(formData: FormData): Promise<Acti
     const actor = await getActingUser();
     const denial = requirePermission<ActionResult>(actor, "EXCEPTION_TRANSITION");
     if (denial) return denial;
+    const rateLimited = await checkRateLimit<ActionResult>(actor.id, "startInvestigation");
+    if (rateLimited) return rateLimited;
     await exceptionWorkflow.startInvestigation(input.exceptionId, { expectedVersion: input.expectedVersion, now: new Date(), actorName: actor.name, actorUserId: actor.id });
     revalidateExceptionPaths(input.exceptionId);
     return { success: true, message: "Investigation started." };
@@ -76,6 +81,8 @@ export async function requestInformationAction(formData: FormData): Promise<Acti
     const actor = await getActingUser();
     const denial = requirePermission<ActionResult>(actor, "EXCEPTION_TRANSITION");
     if (denial) return denial;
+    const rateLimited = await checkRateLimit<ActionResult>(actor.id, "requestInformation");
+    if (rateLimited) return rateLimited;
     await exceptionWorkflow.requestInformation(input.exceptionId, { expectedVersion: input.expectedVersion, now: new Date(), actorName: actor.name, actorUserId: actor.id });
     revalidateExceptionPaths(input.exceptionId);
     return { success: true, message: "Case marked as awaiting information." };
@@ -91,6 +98,8 @@ export async function resumeInvestigationAction(formData: FormData): Promise<Act
     const actor = await getActingUser();
     const denial = requirePermission<ActionResult>(actor, "EXCEPTION_TRANSITION");
     if (denial) return denial;
+    const rateLimited = await checkRateLimit<ActionResult>(actor.id, "resumeInvestigation");
+    if (rateLimited) return rateLimited;
     await exceptionWorkflow.resumeInvestigation(input.exceptionId, { expectedVersion: input.expectedVersion, now: new Date(), actorName: actor.name, actorUserId: actor.id });
     revalidateExceptionPaths(input.exceptionId);
     return { success: true, message: "Investigation resumed." };
@@ -106,6 +115,8 @@ export async function addNoteAction(formData: FormData): Promise<ActionResult> {
     const actor = await getActingUser();
     const denial = requirePermission<ActionResult>(actor, "EXCEPTION_NOTE");
     if (denial) return denial;
+    const rateLimited = await checkRateLimit<ActionResult>(actor.id, "addNote");
+    if (rateLimited) return rateLimited;
     await exceptionWorkflow.addNoteToException(input.exceptionId, {
       expectedVersion: input.expectedVersion,
       now: new Date(),
@@ -129,6 +140,8 @@ export async function recordRootCauseAction(formData: FormData): Promise<ActionR
     const actor = await getActingUser();
     const denial = requirePermission<ActionResult>(actor, "EXCEPTION_ROOT_CAUSE");
     if (denial) return denial;
+    const rateLimited = await checkRateLimit<ActionResult>(actor.id, "recordRootCause");
+    if (rateLimited) return rateLimited;
     await exceptionWorkflow.recordRootCause(input.exceptionId, {
       expectedVersion: input.expectedVersion,
       now: new Date(),
@@ -152,6 +165,8 @@ export async function submitResolutionAction(formData: FormData): Promise<Action
     const actor = await getActingUser();
     const denial = requirePermission<ActionResult>(actor, "EXCEPTION_RESOLVE");
     if (denial) return denial;
+    const rateLimited = await checkRateLimit<ActionResult>(actor.id, "submitResolution");
+    if (rateLimited) return rateLimited;
     await exceptionWorkflow.submitResolution(input.exceptionId, {
       expectedVersion: input.expectedVersion,
       now: new Date(),
@@ -175,6 +190,8 @@ export async function approveExceptionAction(formData: FormData): Promise<Action
     const actor = await getActingUser();
     const denial = requirePermission<ActionResult>(actor, "EXCEPTION_REVIEW");
     if (denial) return denial;
+    const rateLimited = await checkRateLimit<ActionResult>(actor.id, "approveException");
+    if (rateLimited) return rateLimited;
     await exceptionWorkflow.approveException(input.exceptionId, {
       expectedVersion: input.expectedVersion,
       now: new Date(),
@@ -197,6 +214,8 @@ export async function rejectExceptionAction(formData: FormData): Promise<ActionR
     const actor = await getActingUser();
     const denial = requirePermission<ActionResult>(actor, "EXCEPTION_REVIEW");
     if (denial) return denial;
+    const rateLimited = await checkRateLimit<ActionResult>(actor.id, "rejectException");
+    if (rateLimited) return rateLimited;
     await exceptionWorkflow.rejectException(input.exceptionId, {
       expectedVersion: input.expectedVersion,
       now: new Date(),
@@ -219,6 +238,8 @@ export async function addExceptionEvidenceAction(formData: FormData): Promise<Ac
     const actor = await getActingUser();
     const denial = requirePermission<ActionResult>(actor, "EXCEPTION_EVIDENCE");
     if (denial) return denial;
+    const rateLimited = await checkRateLimit<ActionResult>(actor.id, "addExceptionEvidence");
+    if (rateLimited) return rateLimited;
     const upload = await uploadEvidenceFileIfPresent(formData);
     await exceptionWorkflow.addEvidenceToException(input.exceptionId, {
       expectedVersion: input.expectedVersion,
