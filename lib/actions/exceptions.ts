@@ -39,6 +39,7 @@ export async function assignExceptionAction(formData: FormData): Promise<ActionR
       expectedVersion: input.expectedVersion,
       now: new Date(),
       actorName: actor.name,
+      actorUserId: actor.id,
       assignToUserId: input.assignToUserId,
       assignedByUserId: actor.id,
       assigneeName: assignee.name,
@@ -59,7 +60,7 @@ export async function startInvestigationAction(formData: FormData): Promise<Acti
     const actor = await getActingUser();
     const denial = requirePermission<ActionResult>(actor, "EXCEPTION_TRANSITION");
     if (denial) return denial;
-    await exceptionWorkflow.startInvestigation(input.exceptionId, { expectedVersion: input.expectedVersion, now: new Date(), actorName: actor.name });
+    await exceptionWorkflow.startInvestigation(input.exceptionId, { expectedVersion: input.expectedVersion, now: new Date(), actorName: actor.name, actorUserId: actor.id });
     revalidateExceptionPaths(input.exceptionId);
     return { success: true, message: "Investigation started." };
   } catch (error) {
@@ -74,7 +75,7 @@ export async function requestInformationAction(formData: FormData): Promise<Acti
     const actor = await getActingUser();
     const denial = requirePermission<ActionResult>(actor, "EXCEPTION_TRANSITION");
     if (denial) return denial;
-    await exceptionWorkflow.requestInformation(input.exceptionId, { expectedVersion: input.expectedVersion, now: new Date(), actorName: actor.name });
+    await exceptionWorkflow.requestInformation(input.exceptionId, { expectedVersion: input.expectedVersion, now: new Date(), actorName: actor.name, actorUserId: actor.id });
     revalidateExceptionPaths(input.exceptionId);
     return { success: true, message: "Case marked as awaiting information." };
   } catch (error) {
@@ -89,7 +90,7 @@ export async function resumeInvestigationAction(formData: FormData): Promise<Act
     const actor = await getActingUser();
     const denial = requirePermission<ActionResult>(actor, "EXCEPTION_TRANSITION");
     if (denial) return denial;
-    await exceptionWorkflow.resumeInvestigation(input.exceptionId, { expectedVersion: input.expectedVersion, now: new Date(), actorName: actor.name });
+    await exceptionWorkflow.resumeInvestigation(input.exceptionId, { expectedVersion: input.expectedVersion, now: new Date(), actorName: actor.name, actorUserId: actor.id });
     revalidateExceptionPaths(input.exceptionId);
     return { success: true, message: "Investigation resumed." };
   } catch (error) {
@@ -108,6 +109,7 @@ export async function addNoteAction(formData: FormData): Promise<ActionResult> {
       expectedVersion: input.expectedVersion,
       now: new Date(),
       actorName: actor.name,
+      actorUserId: actor.id,
       noteType: input.noteType,
       content: input.content,
       authorUserId: actor.id,
@@ -130,6 +132,7 @@ export async function recordRootCauseAction(formData: FormData): Promise<ActionR
       expectedVersion: input.expectedVersion,
       now: new Date(),
       actorName: actor.name,
+      actorUserId: actor.id,
       rootCauseCategory: input.rootCauseCategory,
       rootCauseSummary: input.rootCauseSummary,
       identifiedByUserId: actor.id,
@@ -152,6 +155,7 @@ export async function submitResolutionAction(formData: FormData): Promise<Action
       expectedVersion: input.expectedVersion,
       now: new Date(),
       actorName: actor.name,
+      actorUserId: actor.id,
       resolutionAction: input.resolutionAction,
       resolutionSummary: input.resolutionSummary,
       resolutionUserId: actor.id,
@@ -174,6 +178,7 @@ export async function approveExceptionAction(formData: FormData): Promise<Action
       expectedVersion: input.expectedVersion,
       now: new Date(),
       actorName: actor.name,
+      actorUserId: actor.id,
       approverUserId: actor.id,
       approvalNote: input.approvalNote || null,
     });
@@ -195,6 +200,7 @@ export async function rejectExceptionAction(formData: FormData): Promise<ActionR
       expectedVersion: input.expectedVersion,
       now: new Date(),
       actorName: actor.name,
+      actorUserId: actor.id,
       approverUserId: actor.id,
       approvalNote: input.approvalNote || null,
     });
@@ -216,6 +222,7 @@ export async function addExceptionEvidenceAction(formData: FormData): Promise<Ac
       expectedVersion: input.expectedVersion,
       now: new Date(),
       actorName: actor.name,
+      actorUserId: actor.id,
       evidenceType: input.evidenceType,
       title: input.title,
       description: input.description || null,

@@ -20,11 +20,11 @@ export async function createAuditEvent(
   entityId: string,
   action: string,
   summary: string,
-  actor: string,
+  actorUserId: string,
   createdAt?: Date,
 ) {
   await tx.auditEvent.create({
-    data: { entityType: "EXCEPTION_CASE", entityId, action, summary, actor, createdAt },
+    data: { entityType: "EXCEPTION_CASE", entityId, action, summary, actorUserId, createdAt },
   });
 }
 

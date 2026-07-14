@@ -97,10 +97,10 @@ async function createAuditEvent(
   entityId: string,
   action: string,
   summary: string,
-  actor: string,
+  actorUserId: string,
   createdAt: Date,
 ) {
-  await prisma.auditEvent.create({ data: { entityType, entityId, action, summary, actor, createdAt } });
+  await prisma.auditEvent.create({ data: { entityType, entityId, action, summary, actorUserId, createdAt } });
 }
 
 async function versionOf(exceptionCaseId: string): Promise<number> {
@@ -147,6 +147,15 @@ async function main() {
   // Every seeded user shares one password (Cloud Phase 2.1) so a reviewer can log in as any role
   // via /login -- see docs/SECURITY_AND_LIMITATIONS.md.
   const seedPasswordHash = hashPassword(process.env.SEED_USER_PASSWORD ?? "payguard-demo");
+
+  // Service account (Cloud Phase 2.3): the audit-actor attribution target for machine-driven
+  // events (e.g. exceptions auto-created by the reconciliation engine itself, as opposed to the
+  // user who clicked "Run reconciliation"). `passwordHash: null` makes it unloginable regardless
+  // of role; `isActive: false` keeps it out of assignment dropdowns and the /login roster
+  // (both driven by getAssignableUsers(), which filters on isActive).
+  const systemUser = await prisma.user.create({
+    data: { email: "system@payguard-ie.internal", name: "System", role: "SYSTEM", isActive: false, passwordHash: null },
+  });
 
   const users = [];
   for (const def of userDefs) {
@@ -213,8 +222,8 @@ async function main() {
     const payment = await createPayment({ customer, currency, amountMinor, status: "COMPLETED", createdAt, expectedSettlementAt });
     const settledAt = hoursAgo(randomInt(rng, 1, 6), expectedSettlementAt);
     await createSettlement(payment, { amountMinor, currency, status: "SETTLED", settledAt });
-    await createAuditEvent("PAYMENT", payment.id, "PAYMENT_CREATED", "Payment received and queued for settlement.", pick(rng, opsAnalysts).name, createdAt);
-    await createAuditEvent("PAYMENT", payment.id, "SETTLEMENT_MATCHED", "Settlement file matched payment with no discrepancies.", "SYSTEM", settledAt);
+    await createAuditEvent("PAYMENT", payment.id, "PAYMENT_CREATED", "Payment received and queued for settlement.", pick(rng, opsAnalysts).id, createdAt);
+    await createAuditEvent("PAYMENT", payment.id, "SETTLEMENT_MATCHED", "Settlement file matched payment with no discrepancies.", systemUser.id, settledAt);
   }
 
   // 4b. Bucket B — completed, no settlement (4): 2 recent (still within SLA at seed time), 2 past SLA
@@ -317,7 +326,7 @@ async function main() {
     const createdAt = daysAgo(randomInt(rng, 1, 10), now);
     const expectedSettlementAt = hoursFromNow(randomInt(rng, 24, 48), createdAt);
     const payment = await createPayment({ customer, currency, amountMinor: randomInt(rng, 2000, 120000), status: "FAILED", createdAt, expectedSettlementAt });
-    await createAuditEvent("PAYMENT", payment.id, "PAYMENT_FAILED", "Payment processing failed at the acquirer.", "SYSTEM", createdAt);
+    await createAuditEvent("PAYMENT", payment.id, "PAYMENT_FAILED", "Payment processing failed at the acquirer.", systemUser.id, createdAt);
   }
 
   // 4i. Bucket I — invalid payment/settlement status combination (2). The only rule with no
@@ -349,7 +358,7 @@ async function main() {
   // 5. Run the real deterministic reconciliation engine. This is what generates the
   // ReconciliationRun, ReconciliationResult and ExceptionCase rows now — every exception
   // below starts life exactly as it would in the running application (status NEW, unassigned).
-  const runResult = await runReconciliation(now);
+  const runResult = await runReconciliation(systemUser.id, now);
   console.log(
     `Reconciliation run ${runResult.runReference}: ${runResult.summary.passedCount} passed, ${runResult.summary.failedCount} failed, ${runResult.summary.exceptionsCreated} exceptions created.`,
   );
@@ -364,13 +373,15 @@ async function main() {
   {
     const exceptionCase = await firstExceptionForPayment(scenarioPaymentIds.missingSettlement[1]);
     const assignee = pick(rng, opsAnalysts);
+    const assignedBy = pick(rng, uatLeads.concat(opsAnalysts));
     await assignException(exceptionCase.id, {
       expectedVersion: exceptionCase.version,
       now: hoursFromNow(1, now),
       actorName: "SYSTEM",
+      actorUserId: assignedBy.id,
       assignToUserId: assignee.id,
       assigneeName: assignee.name,
-      assignedByUserId: pick(rng, uatLeads.concat(opsAnalysts)).id,
+      assignedByUserId: assignedBy.id,
       note: "Please chase the settlement provider for this reference.",
     });
   }
@@ -383,33 +394,35 @@ async function main() {
       expectedVersion: exceptionCase.version,
       now: hoursFromNow(1, now),
       actorName: "SYSTEM",
+      actorUserId: assignee.id,
       assignToUserId: assignee.id,
       assigneeName: assignee.name,
       assignedByUserId: assignee.id,
       note: null,
     });
-    await startInvestigation(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(2, now), actorName: assignee.name });
+    await startInvestigation(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(2, now), actorName: assignee.name, actorUserId: assignee.id });
   }
 
   // amountMismatch[1] -> AWAITING_INFORMATION.
   {
     const exceptionCase = await firstExceptionForPayment(scenarioPaymentIds.amountMismatch[1]);
     const assignee = pick(rng, opsAnalysts);
-    await assignException(exceptionCase.id, { expectedVersion: exceptionCase.version, now: hoursFromNow(1, now), actorName: "SYSTEM", assignToUserId: assignee.id, assigneeName: assignee.name, assignedByUserId: assignee.id, note: null });
-    await startInvestigation(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(2, now), actorName: assignee.name });
-    await requestInformation(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(3, now), actorName: assignee.name });
+    await assignException(exceptionCase.id, { expectedVersion: exceptionCase.version, now: hoursFromNow(1, now), actorName: "SYSTEM", actorUserId: assignee.id, assignToUserId: assignee.id, assigneeName: assignee.name, assignedByUserId: assignee.id, note: null });
+    await startInvestigation(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(2, now), actorName: assignee.name, actorUserId: assignee.id });
+    await requestInformation(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(3, now), actorName: assignee.name, actorUserId: assignee.id });
   }
 
   // amountMismatch[2] -> RESOLVED, awaiting approval.
   {
     const exceptionCase = await firstExceptionForPayment(scenarioPaymentIds.amountMismatch[2]);
     const assignee = pick(rng, opsAnalysts);
-    await assignException(exceptionCase.id, { expectedVersion: exceptionCase.version, now: hoursFromNow(1, now), actorName: "SYSTEM", assignToUserId: assignee.id, assigneeName: assignee.name, assignedByUserId: assignee.id, note: null });
-    await startInvestigation(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(2, now), actorName: assignee.name });
+    await assignException(exceptionCase.id, { expectedVersion: exceptionCase.version, now: hoursFromNow(1, now), actorName: "SYSTEM", actorUserId: assignee.id, assignToUserId: assignee.id, assigneeName: assignee.name, assignedByUserId: assignee.id, note: null });
+    await startInvestigation(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(2, now), actorName: assignee.name, actorUserId: assignee.id });
     await recordRootCause(exceptionCase.id, {
       expectedVersion: await versionOf(exceptionCase.id),
       now: hoursFromNow(4, now),
       actorName: assignee.name,
+      actorUserId: assignee.id,
       rootCauseCategory: "DATA_MAPPING_ERROR",
       rootCauseSummary: "Settlement file mapped the fee amount into the principal field, inflating the settled total.",
       identifiedByUserId: assignee.id,
@@ -418,6 +431,7 @@ async function main() {
       expectedVersion: await versionOf(exceptionCase.id),
       now: hoursFromNow(6, now),
       actorName: assignee.name,
+      actorUserId: assignee.id,
       resolutionAction: "CONFIGURATION_CORRECTED",
       resolutionSummary: "Settlement provider corrected the file mapping and re-sent a corrected settlement record.",
       resolutionUserId: assignee.id,
@@ -429,12 +443,12 @@ async function main() {
     const exceptionCase = await firstExceptionForPayment(scenarioPaymentIds.amountMismatch[3]);
     const resolver = opsAnalysts[0];
     const approver = opsAnalysts[1];
-    await assignException(exceptionCase.id, { expectedVersion: exceptionCase.version, now: hoursFromNow(1, now), actorName: "SYSTEM", assignToUserId: resolver.id, assigneeName: resolver.name, assignedByUserId: resolver.id, note: null });
-    await startInvestigation(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(2, now), actorName: resolver.name });
-    await recordRootCause(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(4, now), actorName: resolver.name, rootCauseCategory: "CURRENCY_CONFIGURATION", rootCauseSummary: "FX conversion step used a stale rate table for this settlement batch.", identifiedByUserId: resolver.id });
-    await submitResolution(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(6, now), actorName: resolver.name, resolutionAction: "CORRECTIVE_SETTLEMENT_APPLIED", resolutionSummary: "Rate table refreshed and a corrective settlement entry applied to match the payment amount.", resolutionUserId: resolver.id });
-    await addEvidenceToException(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(6, now), actorName: resolver.name, evidenceType: "QUERY_RESULT", title: "Corrective settlement query result", description: "Query confirming the corrective settlement entry matches the payment amount.", fileReference: null, addedByUserId: resolver.id });
-    await approveException(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(8, now), actorName: approver.name, approverUserId: approver.id, approvalNote: "Confirmed the corrective entry — closing." });
+    await assignException(exceptionCase.id, { expectedVersion: exceptionCase.version, now: hoursFromNow(1, now), actorName: "SYSTEM", actorUserId: resolver.id, assignToUserId: resolver.id, assigneeName: resolver.name, assignedByUserId: resolver.id, note: null });
+    await startInvestigation(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(2, now), actorName: resolver.name, actorUserId: resolver.id });
+    await recordRootCause(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(4, now), actorName: resolver.name, actorUserId: resolver.id, rootCauseCategory: "CURRENCY_CONFIGURATION", rootCauseSummary: "FX conversion step used a stale rate table for this settlement batch.", identifiedByUserId: resolver.id });
+    await submitResolution(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(6, now), actorName: resolver.name, actorUserId: resolver.id, resolutionAction: "CORRECTIVE_SETTLEMENT_APPLIED", resolutionSummary: "Rate table refreshed and a corrective settlement entry applied to match the payment amount.", resolutionUserId: resolver.id });
+    await addEvidenceToException(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(6, now), actorName: resolver.name, actorUserId: resolver.id, evidenceType: "QUERY_RESULT", title: "Corrective settlement query result", description: "Query confirming the corrective settlement entry matches the payment amount.", fileReference: null, addedByUserId: resolver.id });
+    await approveException(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(8, now), actorName: approver.name, actorUserId: approver.id, approverUserId: approver.id, approvalNote: "Confirmed the corrective entry — closing." });
   }
 
   // amountMismatch[4] -> CLOSED late (approved well after the exception's SLA deadline).
@@ -442,13 +456,13 @@ async function main() {
     const exceptionCase = await firstExceptionForPayment(scenarioPaymentIds.amountMismatch[4]);
     const resolver = opsAnalysts[1];
     const approver = opsAnalysts[2];
-    await assignException(exceptionCase.id, { expectedVersion: exceptionCase.version, now: hoursFromNow(1, now), actorName: "SYSTEM", assignToUserId: resolver.id, assigneeName: resolver.name, assignedByUserId: resolver.id, note: null });
-    await startInvestigation(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(2, now), actorName: resolver.name });
-    await recordRootCause(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: daysFromNow(2, now), actorName: resolver.name, rootCauseCategory: "MANUAL_PROCESSING_ERROR", rootCauseSummary: "Manual settlement entry was keyed with a transposed digit in the amount field.", identifiedByUserId: resolver.id });
-    await submitResolution(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: daysFromNow(3, now), actorName: resolver.name, resolutionAction: "CORRECTIVE_SETTLEMENT_APPLIED", resolutionSummary: "Corrected the keyed amount and re-applied the settlement entry.", resolutionUserId: resolver.id });
-    await addEvidenceToException(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: daysFromNow(3, now), actorName: resolver.name, evidenceType: "SCREENSHOT", title: "Corrected entry screenshot", description: "Screenshot of the corrected manual entry.", fileReference: "/evidence/amount-mismatch-corrected.png", addedByUserId: resolver.id });
+    await assignException(exceptionCase.id, { expectedVersion: exceptionCase.version, now: hoursFromNow(1, now), actorName: "SYSTEM", actorUserId: resolver.id, assignToUserId: resolver.id, assigneeName: resolver.name, assignedByUserId: resolver.id, note: null });
+    await startInvestigation(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(2, now), actorName: resolver.name, actorUserId: resolver.id });
+    await recordRootCause(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: daysFromNow(2, now), actorName: resolver.name, actorUserId: resolver.id, rootCauseCategory: "MANUAL_PROCESSING_ERROR", rootCauseSummary: "Manual settlement entry was keyed with a transposed digit in the amount field.", identifiedByUserId: resolver.id });
+    await submitResolution(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: daysFromNow(3, now), actorName: resolver.name, actorUserId: resolver.id, resolutionAction: "CORRECTIVE_SETTLEMENT_APPLIED", resolutionSummary: "Corrected the keyed amount and re-applied the settlement entry.", resolutionUserId: resolver.id });
+    await addEvidenceToException(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: daysFromNow(3, now), actorName: resolver.name, actorUserId: resolver.id, evidenceType: "SCREENSHOT", title: "Corrected entry screenshot", description: "Screenshot of the corrected manual entry.", fileReference: "/evidence/amount-mismatch-corrected.png", addedByUserId: resolver.id });
     // Approved well past the exception's SLA deadline (max 7 days for LOW severity) to guarantee "closed late".
-    await approveException(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: daysFromNow(10, now), actorName: approver.name, approverUserId: approver.id, approvalNote: "Apologies for the delay reviewing — confirmed correct, closing." });
+    await approveException(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: daysFromNow(10, now), actorName: approver.name, actorUserId: approver.id, approverUserId: approver.id, approvalNote: "Apologies for the delay reviewing — confirmed correct, closing." });
   }
 
   // currencyMismatch[0] -> assigned + investigating, then forced overdue (deterministically, regardless
@@ -456,8 +470,8 @@ async function main() {
   {
     const exceptionCase = await firstExceptionForPayment(scenarioPaymentIds.currencyMismatch[0]);
     const assignee = pick(rng, opsAnalysts);
-    await assignException(exceptionCase.id, { expectedVersion: exceptionCase.version, now: hoursFromNow(1, now), actorName: "SYSTEM", assignToUserId: assignee.id, assigneeName: assignee.name, assignedByUserId: assignee.id, note: null });
-    await startInvestigation(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(2, now), actorName: assignee.name });
+    await assignException(exceptionCase.id, { expectedVersion: exceptionCase.version, now: hoursFromNow(1, now), actorName: "SYSTEM", actorUserId: assignee.id, assignToUserId: assignee.id, assigneeName: assignee.name, assignedByUserId: assignee.id, note: null });
+    await startInvestigation(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(2, now), actorName: assignee.name, actorUserId: assignee.id });
     await prisma.exceptionCase.update({ where: { id: exceptionCase.id }, data: { slaDeadline: daysAgo(2, now) } });
   }
 
@@ -465,15 +479,15 @@ async function main() {
   {
     const exceptionCase = await firstExceptionForPayment(scenarioPaymentIds.duplicate[0]);
     const assignee = pick(rng, opsAnalysts);
-    await assignException(exceptionCase.id, { expectedVersion: exceptionCase.version, now: hoursFromNow(1, now), actorName: "SYSTEM", assignToUserId: assignee.id, assigneeName: assignee.name, assignedByUserId: assignee.id, note: "Confirm with customer service before reversing." });
+    await assignException(exceptionCase.id, { expectedVersion: exceptionCase.version, now: hoursFromNow(1, now), actorName: "SYSTEM", actorUserId: assignee.id, assignToUserId: assignee.id, assigneeName: assignee.name, assignedByUserId: assignee.id, note: "Confirm with customer service before reversing." });
   }
 
   // delayedSettlement[0] -> investigating; used below as the "UAT fail linked to an exception" target.
   const linkedExceptionId = (await (async () => {
     const exceptionCase = await firstExceptionForPayment(scenarioPaymentIds.delayedSettlement[0]);
     const assignee = pick(rng, opsAnalysts);
-    await assignException(exceptionCase.id, { expectedVersion: exceptionCase.version, now: hoursFromNow(1, now), actorName: "SYSTEM", assignToUserId: assignee.id, assigneeName: assignee.name, assignedByUserId: assignee.id, note: null });
-    await startInvestigation(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(2, now), actorName: assignee.name });
+    await assignException(exceptionCase.id, { expectedVersion: exceptionCase.version, now: hoursFromNow(1, now), actorName: "SYSTEM", actorUserId: assignee.id, assignToUserId: assignee.id, assigneeName: assignee.name, assignedByUserId: assignee.id, note: null });
+    await startInvestigation(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(2, now), actorName: assignee.name, actorUserId: assignee.id });
     return exceptionCase.id;
   })());
 
@@ -483,18 +497,18 @@ async function main() {
     const exceptionCase = await firstExceptionForPayment(scenarioPaymentIds.delayedSettlement[1]);
     const resolver = opsAnalysts[0];
     const approver = opsAnalysts[1];
-    await assignException(exceptionCase.id, { expectedVersion: exceptionCase.version, now: hoursFromNow(1, now), actorName: "SYSTEM", assignToUserId: resolver.id, assigneeName: resolver.name, assignedByUserId: resolver.id, note: null });
-    await startInvestigation(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(2, now), actorName: resolver.name });
-    await recordRootCause(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(4, now), actorName: resolver.name, rootCauseCategory: "UPSTREAM_PROVIDER_DELAY", rootCauseSummary: "Settlement provider's overnight batch ran late for this settlement cycle.", identifiedByUserId: resolver.id });
-    await submitResolution(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(6, now), actorName: resolver.name, resolutionAction: "UPSTREAM_PROVIDER_CONFIRMED", resolutionSummary: "Provider confirmed a one-off batch delay with no further action needed.", resolutionUserId: resolver.id });
-    await rejectException(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(8, now), actorName: approver.name, approverUserId: approver.id, approvalNote: "Please get written confirmation from the provider before we accept this as a one-off." });
+    await assignException(exceptionCase.id, { expectedVersion: exceptionCase.version, now: hoursFromNow(1, now), actorName: "SYSTEM", actorUserId: resolver.id, assignToUserId: resolver.id, assigneeName: resolver.name, assignedByUserId: resolver.id, note: null });
+    await startInvestigation(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(2, now), actorName: resolver.name, actorUserId: resolver.id });
+    await recordRootCause(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(4, now), actorName: resolver.name, actorUserId: resolver.id, rootCauseCategory: "UPSTREAM_PROVIDER_DELAY", rootCauseSummary: "Settlement provider's overnight batch ran late for this settlement cycle.", identifiedByUserId: resolver.id });
+    await submitResolution(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(6, now), actorName: resolver.name, actorUserId: resolver.id, resolutionAction: "UPSTREAM_PROVIDER_CONFIRMED", resolutionSummary: "Provider confirmed a one-off batch delay with no further action needed.", resolutionUserId: resolver.id });
+    await rejectException(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(8, now), actorName: approver.name, actorUserId: approver.id, approverUserId: approver.id, approvalNote: "Please get written confirmation from the provider before we accept this as a one-off." });
   }
 
   // stuckPayment[0] -> assigned, for queue variety. The rest stay NEW/unassigned.
   {
     const exceptionCase = await firstExceptionForPayment(scenarioPaymentIds.stuckPayment[0]);
     const assignee = pick(rng, opsAnalysts);
-    await assignException(exceptionCase.id, { expectedVersion: exceptionCase.version, now: hoursFromNow(1, now), actorName: "SYSTEM", assignToUserId: assignee.id, assigneeName: assignee.name, assignedByUserId: assignee.id, note: null });
+    await assignException(exceptionCase.id, { expectedVersion: exceptionCase.version, now: hoursFromNow(1, now), actorName: "SYSTEM", actorUserId: assignee.id, assignToUserId: assignee.id, assigneeName: assignee.name, assignedByUserId: assignee.id, note: null });
   }
 
   console.log("Exception lifecycle scenarios applied.");

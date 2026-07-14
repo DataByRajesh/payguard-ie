@@ -283,14 +283,15 @@ model ExceptionComment {
 }
 
 model AuditEvent {
-  id         String   @id @default(cuid())
-  entityType String
-  entityId   String
-  action     String
-  summary    String
-  actor      String
-  metadata   String?
-  createdAt  DateTime @default(now())
+  id          String   @id @default(cuid())
+  entityType  String
+  entityId    String
+  action      String
+  summary     String
+  actorUserId String
+  actorUser   User     @relation("AuditEventActor", fields: [actorUserId], references: [id])
+  metadata    String?
+  createdAt   DateTime @default(now())
 
   @@index([entityType, entityId])
 }
@@ -364,4 +365,5 @@ model User {
   exceptionNotes       ExceptionComment[] @relation("ExceptionNoteAuthor")
   evidenceAdded        EvidenceRecord[]   @relation("EvidenceAddedByUser")
   uatExecutionsAsTester UATExecution[]    @relation("UatTester")
+  auditEventsAsActor   AuditEvent[]       @relation("AuditEventActor")
 }

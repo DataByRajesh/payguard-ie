@@ -149,7 +149,7 @@ async function nextCaseReference(): Promise<string> {
   return `EXC-${String(count + 1).padStart(6, "0")}`;
 }
 
-async function createSystemExceptionCase(evaluation: Extract<RuleEvaluation, { passed: false }>, dedupeKey: string, now: Date) {
+async function createSystemExceptionCase(evaluation: Extract<RuleEvaluation, { passed: false }>, dedupeKey: string, now: Date, actorUserId: string) {
   const caseReference = await nextCaseReference();
   const slaDeadline = new Date(now.getTime() + severityToSlaHours(evaluation.severity) * 60 * 60 * 1000);
 
@@ -176,7 +176,7 @@ async function createSystemExceptionCase(evaluation: Extract<RuleEvaluation, { p
       entityId: exceptionCase.id,
       action: "EXCEPTION_AUTO_CREATED",
       summary: "Exception automatically created by reconciliation run",
-      actor: "SYSTEM",
+      actorUserId,
       createdAt: now,
     },
   });
@@ -190,7 +190,7 @@ async function createSystemExceptionCase(evaluation: Extract<RuleEvaluation, { p
  * docs/RECONCILIATION_RULES.md), linking the result to it either way. Returns the number of
  * genuinely *new* exceptions created (as opposed to re-linked to an existing open one).
  */
-export async function persistResults(runId: string, evaluations: RuleEvaluation[], now: Date): Promise<number> {
+export async function persistResults(runId: string, evaluations: RuleEvaluation[], now: Date, actorUserId: string): Promise<number> {
   let exceptionsCreated = 0;
 
   for (const evaluation of evaluations) {
@@ -206,7 +206,7 @@ export async function persistResults(runId: string, evaluations: RuleEvaluation[
         await prisma.exceptionCase.update({ where: { id: existing.id }, data: { lastDetectedAt: now } });
         exceptionCaseId = existing.id;
       } else {
-        const created = await createSystemExceptionCase(evaluation, dedupeKey, now);
+        const created = await createSystemExceptionCase(evaluation, dedupeKey, now, actorUserId);
         exceptionCaseId = created.id;
         exceptionsCreated += 1;
       }

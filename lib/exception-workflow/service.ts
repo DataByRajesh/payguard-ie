@@ -35,6 +35,7 @@ export interface MutationContext {
   expectedVersion: number;
   now: Date;
   actorName: string;
+  actorUserId: string;
 }
 
 export async function assignException(
@@ -69,7 +70,7 @@ export async function assignException(
       exceptionId,
       exceptionCase.assignedUserId ? "EXCEPTION_REASSIGNED" : "EXCEPTION_ASSIGNED",
       `${verb} to ${params.assigneeName} by ${params.actorName}.`,
-      params.actorName,
+      params.actorUserId,
       params.now,
     );
     return updated;
@@ -90,7 +91,7 @@ async function transitionStatus(
 
   return prisma.$transaction(async (tx) => {
     const updated = await updateExceptionWithVersionCheck(tx, exceptionId, params.expectedVersion, { status: to });
-    await createAuditEvent(tx, exceptionId, action, summary, params.actorName, params.now);
+    await createAuditEvent(tx, exceptionId, action, summary, params.actorUserId, params.now);
     return updated;
   });
 }
@@ -144,7 +145,7 @@ export async function addNoteToException(
       createdAt: params.now,
     });
     // Deliberately does not copy the note body into the audit summary.
-    await createAuditEvent(tx, exceptionId, "EXCEPTION_NOTE_ADDED", `${params.actorName} added a ${params.noteType.toLowerCase()} note.`, params.actorName, params.now);
+    await createAuditEvent(tx, exceptionId, "EXCEPTION_NOTE_ADDED", `${params.actorName} added a ${params.noteType.toLowerCase()} note.`, params.actorUserId, params.now);
     void exceptionCase;
     return updated;
   });
@@ -174,7 +175,7 @@ export async function recordRootCause(
       exceptionId,
       isUpdate ? "ROOT_CAUSE_UPDATED" : "ROOT_CAUSE_RECORDED",
       `${params.actorName} ${isUpdate ? "updated" : "recorded"} the root cause (${params.rootCauseCategory}).`,
-      params.actorName,
+      params.actorUserId,
       params.now,
     );
     return updated;
@@ -206,7 +207,7 @@ export async function submitResolution(
       resolutionAt: params.now,
       resolvedAt: params.now,
     });
-    await createAuditEvent(tx, exceptionId, "RESOLUTION_SUBMITTED", `${params.actorName} submitted a resolution (${params.resolutionAction}).`, params.actorName, params.now);
+    await createAuditEvent(tx, exceptionId, "RESOLUTION_SUBMITTED", `${params.actorName} submitted a resolution (${params.resolutionAction}).`, params.actorUserId, params.now);
     return updated;
   });
 }
@@ -236,7 +237,7 @@ export async function approveException(
       approvalAt: params.now,
       closedAt: params.now,
     });
-    await createAuditEvent(tx, exceptionId, "EXCEPTION_APPROVED", `${params.actorName} approved and closed the case.`, params.actorName, params.now);
+    await createAuditEvent(tx, exceptionId, "EXCEPTION_APPROVED", `${params.actorName} approved and closed the case.`, params.actorUserId, params.now);
     return updated;
   });
 }
@@ -264,7 +265,7 @@ export async function rejectException(
       approvalNote: params.approvalNote,
       approvalAt: params.now,
     });
-    await createAuditEvent(tx, exceptionId, "RESOLUTION_REJECTED", `${params.actorName} rejected the resolution and reopened investigation.`, params.actorName, params.now);
+    await createAuditEvent(tx, exceptionId, "RESOLUTION_REJECTED", `${params.actorName} rejected the resolution and reopened investigation.`, params.actorUserId, params.now);
     return updated;
   });
 }
@@ -292,7 +293,7 @@ export async function addEvidenceToException(
       addedByUserId: params.addedByUserId,
       createdAt: params.now,
     });
-    await createAuditEvent(tx, exceptionId, "EVIDENCE_ADDED", `${params.actorName} added evidence (${evidence.evidenceRef}).`, params.actorName, params.now);
+    await createAuditEvent(tx, exceptionId, "EVIDENCE_ADDED", `${params.actorName} added evidence (${evidence.evidenceRef}).`, params.actorUserId, params.now);
     return { exceptionCase: updated, evidence };
   });
 }

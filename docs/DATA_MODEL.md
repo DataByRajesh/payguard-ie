@@ -24,7 +24,7 @@ See [RECONCILIATION_RULES.md](RECONCILIATION_RULES.md) for what each rule actual
   - `version` is the optimistic-concurrency counter (see [EXCEPTION_LIFECYCLE.md#optimistic-concurrency](EXCEPTION_LIFECYCLE.md#optimistic-concurrency)).
   - `source` defaults to `"MANUAL"` at the column level, but every case actually created by this codebase comes from the reconciliation engine with `source: "SYSTEM"` — `"MANUAL"` exists for schema completeness/future manual-case creation, not because any code path uses it today.
 - **`ExceptionComment`** — despite the name, these are typed investigation notes (`ExceptionNoteType`), not free-form comments; kept from the Sprint 2 schema name rather than renamed, to avoid an unnecessary migration.
-- **`AuditEvent`** — a generic, append-only event log (`entityType` + `entityId`, not a foreign key) shared by both the exception workflow and the UAT workflow, so one model/index serves both rather than two parallel audit tables.
+- **`AuditEvent`** — a generic, append-only event log (`entityType` + `entityId`, not a foreign key) shared by both the exception workflow and the UAT workflow, so one model/index serves both rather than two parallel audit tables. `actorUserId` (required, Cloud Phase 2.3) is a real FK to `User`, not a free-text name — a seeded, unloginable service-account user (`system@payguard-ie.internal`) is the fallback for machine-driven events with no real acting user.
 - **`EvidenceRecord`** — nullable foreign keys to *both* `ExceptionCase` and `UATExecution` (never both set on the same row) rather than a polymorphic join table, since there are only ever two possible owners.
 
 ## UAT workspace (Sprint 3)
@@ -34,7 +34,7 @@ See [RECONCILIATION_RULES.md](RECONCILIATION_RULES.md) for what each rule actual
 
 ## Identity
 
-- **`User`** — seeded only; no sign-up flow, but real login as of Cloud Phase 2.1 (`passwordHash`, checked by `lib/actions/auth.ts`). `isActive` gates login, exception assignment, and acting as anyone (an inactive user can't log in, be assigned, or act). Eight named relations back onto `ExceptionCase`/`ExceptionComment`/`EvidenceRecord`/`UATExecution`, reflecting every place a user can be "the actor" for something in this schema.
+- **`User`** — seeded only; no sign-up flow, but real login as of Cloud Phase 2.1 (`passwordHash`, checked by `lib/actions/auth.ts`). `isActive` gates login, exception assignment, and acting as anyone (an inactive user can't log in, be assigned, or act). Nine named relations back onto `ExceptionCase`/`ExceptionComment`/`EvidenceRecord`/`UATExecution`/`AuditEvent`, reflecting every place a user can be "the actor" for something in this schema.
 
 See [SECURITY_AND_LIMITATIONS.md](SECURITY_AND_LIMITATIONS.md) for what's still missing (authorization, secure evidence storage) even with real login in place.
 
