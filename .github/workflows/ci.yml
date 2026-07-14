@@ -24,9 +24,6 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
-    env:
-      DATABASE_URL: postgresql://payguard:payguard@localhost:5432/payguard_dev
-
     steps:
       - uses: actions/checkout@v4
 
@@ -61,6 +58,10 @@ jobs:
 
       - name: Apply migrations for build
         run: pnpm exec prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://payguard:payguard@localhost:5432/payguard_dev
 
       - name: Build
         run: pnpm build
+        env:
+          DATABASE_URL: postgresql://payguard:payguard@localhost:5432/payguard_dev
