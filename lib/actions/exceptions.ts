@@ -14,6 +14,7 @@ import {
 } from "@/lib/validation/exceptionWorkflow";
 import { formDataToObject, mapWorkflowError, type ActionResult } from "./helpers";
 import { isDemoReadOnly, demoReadOnlyResult } from "@/lib/demo-mode";
+import { requirePermission } from "@/lib/auth/permissions";
 import * as exceptionWorkflow from "@/lib/exception-workflow/service";
 
 function revalidateExceptionPaths(exceptionId: string) {
@@ -27,6 +28,8 @@ export async function assignExceptionAction(formData: FormData): Promise<ActionR
   try {
     const input = assignExceptionSchema.parse(formDataToObject(formData));
     const actor = await getActingUser();
+    const denial = requirePermission<ActionResult>(actor, "EXCEPTION_ASSIGN");
+    if (denial) return denial;
     const assignee = await prisma.user.findUnique({ where: { id: input.assignToUserId } });
     if (!assignee || !assignee.isActive) {
       return { success: false, message: "The selected user is inactive or does not exist." };
@@ -54,6 +57,8 @@ export async function startInvestigationAction(formData: FormData): Promise<Acti
   try {
     const input = transitionExceptionSchema.parse(formDataToObject(formData));
     const actor = await getActingUser();
+    const denial = requirePermission<ActionResult>(actor, "EXCEPTION_TRANSITION");
+    if (denial) return denial;
     await exceptionWorkflow.startInvestigation(input.exceptionId, { expectedVersion: input.expectedVersion, now: new Date(), actorName: actor.name });
     revalidateExceptionPaths(input.exceptionId);
     return { success: true, message: "Investigation started." };
@@ -67,6 +72,8 @@ export async function requestInformationAction(formData: FormData): Promise<Acti
   try {
     const input = transitionExceptionSchema.parse(formDataToObject(formData));
     const actor = await getActingUser();
+    const denial = requirePermission<ActionResult>(actor, "EXCEPTION_TRANSITION");
+    if (denial) return denial;
     await exceptionWorkflow.requestInformation(input.exceptionId, { expectedVersion: input.expectedVersion, now: new Date(), actorName: actor.name });
     revalidateExceptionPaths(input.exceptionId);
     return { success: true, message: "Case marked as awaiting information." };
@@ -80,6 +87,8 @@ export async function resumeInvestigationAction(formData: FormData): Promise<Act
   try {
     const input = transitionExceptionSchema.parse(formDataToObject(formData));
     const actor = await getActingUser();
+    const denial = requirePermission<ActionResult>(actor, "EXCEPTION_TRANSITION");
+    if (denial) return denial;
     await exceptionWorkflow.resumeInvestigation(input.exceptionId, { expectedVersion: input.expectedVersion, now: new Date(), actorName: actor.name });
     revalidateExceptionPaths(input.exceptionId);
     return { success: true, message: "Investigation resumed." };
@@ -93,6 +102,8 @@ export async function addNoteAction(formData: FormData): Promise<ActionResult> {
   try {
     const input = addNoteSchema.parse(formDataToObject(formData));
     const actor = await getActingUser();
+    const denial = requirePermission<ActionResult>(actor, "EXCEPTION_NOTE");
+    if (denial) return denial;
     await exceptionWorkflow.addNoteToException(input.exceptionId, {
       expectedVersion: input.expectedVersion,
       now: new Date(),
@@ -113,6 +124,8 @@ export async function recordRootCauseAction(formData: FormData): Promise<ActionR
   try {
     const input = recordRootCauseSchema.parse(formDataToObject(formData));
     const actor = await getActingUser();
+    const denial = requirePermission<ActionResult>(actor, "EXCEPTION_ROOT_CAUSE");
+    if (denial) return denial;
     await exceptionWorkflow.recordRootCause(input.exceptionId, {
       expectedVersion: input.expectedVersion,
       now: new Date(),
@@ -133,6 +146,8 @@ export async function submitResolutionAction(formData: FormData): Promise<Action
   try {
     const input = submitResolutionSchema.parse(formDataToObject(formData));
     const actor = await getActingUser();
+    const denial = requirePermission<ActionResult>(actor, "EXCEPTION_RESOLVE");
+    if (denial) return denial;
     await exceptionWorkflow.submitResolution(input.exceptionId, {
       expectedVersion: input.expectedVersion,
       now: new Date(),
@@ -153,6 +168,8 @@ export async function approveExceptionAction(formData: FormData): Promise<Action
   try {
     const input = reviewExceptionSchema.parse(formDataToObject(formData));
     const actor = await getActingUser();
+    const denial = requirePermission<ActionResult>(actor, "EXCEPTION_REVIEW");
+    if (denial) return denial;
     await exceptionWorkflow.approveException(input.exceptionId, {
       expectedVersion: input.expectedVersion,
       now: new Date(),
@@ -172,6 +189,8 @@ export async function rejectExceptionAction(formData: FormData): Promise<ActionR
   try {
     const input = reviewExceptionSchema.parse(formDataToObject(formData));
     const actor = await getActingUser();
+    const denial = requirePermission<ActionResult>(actor, "EXCEPTION_REVIEW");
+    if (denial) return denial;
     await exceptionWorkflow.rejectException(input.exceptionId, {
       expectedVersion: input.expectedVersion,
       now: new Date(),
@@ -191,6 +210,8 @@ export async function addExceptionEvidenceAction(formData: FormData): Promise<Ac
   try {
     const input = addExceptionEvidenceSchema.parse(formDataToObject(formData));
     const actor = await getActingUser();
+    const denial = requirePermission<ActionResult>(actor, "EXCEPTION_EVIDENCE");
+    if (denial) return denial;
     await exceptionWorkflow.addEvidenceToException(input.exceptionId, {
       expectedVersion: input.expectedVersion,
       now: new Date(),

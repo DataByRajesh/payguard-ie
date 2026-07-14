@@ -47,6 +47,6 @@ Every execution and every evidence attachment writes an `AuditEvent` (`entityTyp
 
 ## Known limitations
 
-- No authorization — same as the rest of the app; every logged-in user can execute every test case until Cloud Phase 2.2's role-based authorization lands.
+- Role-based authorization (Cloud Phase 2.2) restricts who may execute test cases (`APP_SUPPORT`/`UAT_LEAD`/`ADMIN`, not `OPS_ANALYST`), but there's no finer-grained scoping beyond that.
 - No cycle/release grouping — executions are a flat history per test case, not organised into named test cycles or release sign-offs (out of scope this sprint).
 - No coverage reporting linking test cases to specific application features beyond the free-text `area` field.

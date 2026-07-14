@@ -9,6 +9,7 @@ An internal payments operations, reconciliation, exception-investigation and UAT
 - **Cloud Phase 1A**: migrated local development from SQLite to PostgreSQL (Docker Compose), switched the package manager to pnpm — local/test/cloud environments now run the same database engine. See [docs/LOCAL_POSTGRES_SETUP.md](docs/LOCAL_POSTGRES_SETUP.md).
 - **Cloud Phase 1B**: public Vercel demo deployment — isolated Preview/Production Postgres databases, migrations applied automatically on deploy, and a `DEMO_READ_ONLY` flag that disables every mutating action (including reconciliation execution) for every visitor to the public demo. See [docs/CLOUD_DEPLOYMENT.md](docs/CLOUD_DEPLOYMENT.md).
 - **Cloud Phase 2.1**: real authentication — `/login`, signed session cookies, password-protected seeded users, replacing the old free-switch acting-user selector. See [docs/SECURITY_AND_LIMITATIONS.md](docs/SECURITY_AND_LIMITATIONS.md).
+- **Cloud Phase 2.2**: role-based authorization — every mutating action now checks the logged-in user's role (`OPS_ANALYST`/`APP_SUPPORT`/`UAT_LEAD`/`ADMIN`), and `/settings` gained real admin-only user management (create, change role, activate/deactivate, reset password).
 
 Per-sprint delivery detail: [SPRINT1_SUMMARY.md](SPRINT1_SUMMARY.md), [SPRINT2_SUMMARY.md](SPRINT2_SUMMARY.md), [SPRINT3_SUMMARY.md](SPRINT3_SUMMARY.md), [SPRINT4_SUMMARY.md](SPRINT4_SUMMARY.md). System-wide docs: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/DATA_MODEL.md](docs/DATA_MODEL.md), [docs/TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md), [docs/SECURITY_AND_LIMITATIONS.md](docs/SECURITY_AND_LIMITATIONS.md), [docs/LOCAL_POSTGRES_SETUP.md](docs/LOCAL_POSTGRES_SETUP.md), [docs/CLOUD_DEPLOYMENT.md](docs/CLOUD_DEPLOYMENT.md).
 
@@ -85,7 +86,7 @@ A deterministic engine (`lib/reconciliation-engine/`) evaluates seven rules agai
 
 **Local workflow**: `pnpm dev`, open `/reconciliation`, click "Run reconciliation". The run summary, run history, and a full results table (with links to the underlying payment, settlement and any generated exception) update immediately. `/exceptions` is a filterable queue (type/severity/status/SLA state/payment reference) with a detail page showing the triggering reconciliation result, audit timeline, comments and evidence.
 
-**Known limitations**: no pagination (loads all payments per run — fine at this project's scale), sequential (not batched) persistence writes, no role-based authorization on the run action (any logged-in user can trigger it — see `docs/SECURITY_AND_LIMITATIONS.md`). Full list in `docs/RECONCILIATION_RULES.md`.
+**Known limitations**: no pagination (loads all payments per run — fine at this project's scale), sequential (not batched) persistence writes. Full list in `docs/RECONCILIATION_RULES.md`.
 
 ## Exception workflow and UAT (Sprint 3)
 

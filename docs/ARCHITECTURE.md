@@ -37,9 +37,9 @@ There is no client-side state management (no Redux/Zustand/React Query). Reads a
 
 All three follow the identical four-layer shape above — once you understand one, you understand all three.
 
-## Identity: signed sessions, not yet authorization
+## Identity and authorization: signed sessions plus role checks
 
-Cloud Phase 2.1 added real login: `proxy.ts` (Next.js 16's renamed `middleware.ts` — see its file header) redirects any request without a valid session cookie to `/login`; `lib/actions/auth.ts` verifies a password (`lib/auth/password.ts`, `node:crypto.scrypt`) and issues a signed, stateless session cookie (`lib/auth/session.ts`, HMAC-SHA256, `SESSION_SECRET`). `lib/acting-user.ts` looks up the `User` row for the current session and is what every Server Action attributes its mutation to. Sessions are stateless — revocation only works via `User.isActive`, checked on every request — see [SECURITY_AND_LIMITATIONS.md](SECURITY_AND_LIMITATIONS.md) for that trade-off. There is still no per-role authorization: any logged-in user can perform any action until Cloud Phase 2.2.
+Cloud Phase 2.1 added real login: `proxy.ts` (Next.js 16's renamed `middleware.ts` — see its file header) redirects any request without a valid session cookie to `/login`; `lib/actions/auth.ts` verifies a password (`lib/auth/password.ts`, `node:crypto.scrypt`) and issues a signed, stateless session cookie (`lib/auth/session.ts`, HMAC-SHA256, `SESSION_SECRET`). `lib/acting-user.ts` looks up the `User` row for the current session and is what every Server Action attributes its mutation to. Sessions are stateless — revocation only works via `User.isActive`, checked on every request — see [SECURITY_AND_LIMITATIONS.md](SECURITY_AND_LIMITATIONS.md) for that trade-off. Cloud Phase 2.2 added role-based authorization on top: `lib/auth/permissions.ts`'s `requirePermission(actor, permission)` gates every mutating Server Action by the actor's role, right after `getActingUser()` resolves it.
 
 ## Persistence: PostgreSQL via a driver adapter
 
