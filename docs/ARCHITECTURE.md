@@ -49,6 +49,7 @@ Prisma 7 generates a client into `app/generated/prisma` and is instantiated thro
 
 | Route | Purpose |
 | --- | --- |
+| `/login` | Password login; the only route `proxy.ts` allows without a valid session |
 | `/dashboard` | Live stat tiles across payments, exceptions, UAT and the latest reconciliation run |
 | `/payments`, `/payments/[id]` | Payments list (filterable) and detail (settlement, reconciliation results, exceptions, audit timeline) |
 | `/settlements` | Settlements list |
@@ -56,8 +57,9 @@ Prisma 7 generates a client into `app/generated/prisma` and is instantiated thro
 | `/exceptions`, `/exceptions/[id]` | Exception queue (filterable) and the full investigation workspace |
 | `/uat`, `/uat/[id]` | UAT queue and test-case execution history |
 | `/reports`, `/reports/[type]` (route handler) | Live Markdown/CSV/print-friendly-HTML exports |
-| `/settings` | Placeholder — user/role management is explicitly out of scope (no auth exists) |
+| `/settings` | Admin-only (Cloud Phase 2.2) user management — create, change role, activate/deactivate, reset password |
+| `/evidence/[...path]` (route handler) | Serves evidence files uploaded via the `LOCAL` storage adapter (Cloud Phase 2.4); unused when `EVIDENCE_STORAGE_PROVIDER=vercel-blob` |
 
 ## What's deliberately not here
 
-No message queue, no background jobs/cron, no external HTTP calls, no file storage service, no multi-tenancy, no real payment rails. These are documented, not accidental — see [SECURITY_AND_LIMITATIONS.md](SECURITY_AND_LIMITATIONS.md) for the full list and reasoning.
+No message queue, no background jobs/cron, no external HTTP calls beyond the evidence-file storage adapters (Cloud Phase 2.4), no multi-tenancy, no real payment rails. These are documented, not accidental — see [SECURITY_AND_LIMITATIONS.md](SECURITY_AND_LIMITATIONS.md) for the full list and reasoning.

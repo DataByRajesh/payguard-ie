@@ -22,10 +22,14 @@ The one place Vitest talks to a real database (`payguard_vitest`) rather than mo
 
 Full-browser journeys against a prebuilt `next start` server (`playwright.config.ts`) on a dedicated port (3100) and the `payguard_test` database:
 
+- `auth.spec.ts` (Cloud Phase 2.1) — visiting a protected route while logged out redirects to `/login`, a wrong password is rejected with a clear message, and a correct login reaches `/dashboard` with logout returning to `/login`.
+- `rbac.spec.ts` (Cloud Phase 2.2) — a role without a given action's permission is rejected, not just unauthenticated.
 - `smoke.spec.ts` — dashboard navigation, payments list + status filter round-trip, payment detail navigation, settlements list rendering.
 - `reconciliation.spec.ts` — run reconciliation, open the run detail, follow a result to its linked exception, re-run and confirm no duplicate open exceptions, exceptions-list filtering.
-- `exception-lifecycle.spec.ts` — the full assign → investigate → note → root cause → evidence → resolve → independent-user approval journey with an audit-trail assertion, plus a separate resolve-then-reject journey and exceptions-list status/unassigned filtering.
+- `exception-lifecycle.spec.ts` — the full assign → investigate → note → root cause → evidence (including a real file upload via `page.setInputFiles()`, Cloud Phase 2.4) → resolve → independent-user approval journey with an audit-trail assertion, plus a separate resolve-then-reject journey and exceptions-list status/unassigned filtering.
 - `uat.spec.ts` — record a failed execution, link it to an existing exception, attach evidence, follow the link through to the exception detail page, UAT summary tiles.
+
+All specs except `auth.spec.ts` run pre-authenticated via Playwright's `storageState` (`tests/e2e/auth.setup.ts`, a "setup" project dependency in `playwright.config.ts`) so they don't each need to perform a real login through the UI.
 
 **Why a prebuilt server, not `next dev`:** Server Action calls against `next dev` were observed to hang intermittently on this stack (Next.js 16 / React 19), independent of invocation pattern; a prebuilt `next start` server serves every route pre-compiled and avoids Turbopack's on-demand first-request compile delay. `retries: 2` (both suite-level and, for the longest Sprint 3 journeys, an additional per-step retry) is the pragmatic mitigation for occasional Chromium process crashes observed on a heavily-loaded shared sandbox during development — confirmed by 100%-reliable results from the equivalent Vitest integration tests and interactive manual verification of the identical flows, i.e. not an application or test defect. Investigating this flakiness surfaced two real fixes that shipped regardless: `useActionState` + native `<form action>` binding was replaced everywhere with the `useTransition` pattern (`lib/hooks/useWorkflowActionState.ts`), and nav links set `prefetch={false}` (`components/layout/NavLink.tsx`) since every page here is dynamic (cookie-dependent) and background prefetches were starving genuine in-flight requests under load.
 

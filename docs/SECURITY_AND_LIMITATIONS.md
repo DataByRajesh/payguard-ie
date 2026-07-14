@@ -14,7 +14,7 @@ There is real login: `proxy.ts` redirects any request without a valid session co
 
 ## No real payment rails or external connectivity
 
-There is no message queue, no background jobs/cron, no outbound HTTP calls, no file storage service, no multi-tenancy, and no connection to any real bank, card scheme, or payment processor. Every `Payment`/`Settlement` row is synthetic seed data ([DATA_MODEL.md](DATA_MODEL.md)) — the "settlement file" concept referenced by the reconciliation engine's `sourceFileReference` field is a label on a seeded row, not an actual file ingested from anywhere.
+There is no message queue, no background jobs/cron, no outbound HTTP calls beyond the evidence-file storage adapters (Cloud Phase 2.4, see below), no multi-tenancy, and no connection to any real bank, card scheme, or payment processor. Every `Payment`/`Settlement` row is synthetic seed data ([DATA_MODEL.md](DATA_MODEL.md)) — the "settlement file" concept referenced by the reconciliation engine's `sourceFileReference` field is a label on a seeded row, not an actual file ingested from anywhere.
 
 ## Evidence file storage (Cloud Phase 2.4)
 
@@ -36,7 +36,7 @@ Both the reconciliation engine (loads every payment per run) and the reports exp
 
 ## Local Postgres, no backup/replication story
 
-The local Postgres instance (`docker-compose.yml`) is a single, disposable container with no replica ([ARCHITECTURE.md](ARCHITECTURE.md), [LOCAL_POSTGRES_SETUP.md](LOCAL_POSTGRES_SETUP.md)). `pnpm demo:reset` drops and recreates the `payguard_dev` schema from scratch — deliberately destructive, and deliberately scoped to only ever touch that one local database (never a Preview/Production database, and never anything outside the local Docker container). There is no backup, point-in-time recovery, or replication story for the local environment; the cloud environment (Phase 1B) relies on the managed Postgres provider's own backup/PITR guarantees rather than anything this project implements itself.
+The local Postgres instance (`docker-compose.yml`) is a single, disposable container with no replica ([ARCHITECTURE.md](ARCHITECTURE.md), [LOCAL_POSTGRES_SETUP.md](LOCAL_POSTGRES_SETUP.md)). `pnpm demo:reset` drops and recreates the `payguard_dev` schema from scratch — deliberately destructive, and deliberately scoped to only ever touch that one local database (never a Preview/Production database, and never anything outside the local Docker container). There is no backup, point-in-time recovery, or replication story for the local environment; the cloud environment (Phase 1B) relies on the managed Postgres provider's own backup/PITR guarantees rather than anything this project implements itself. Restore runbook and incident checklist: [BACKUP_AND_RECOVERY.md](BACKUP_AND_RECOVERY.md).
 
 ## Duplicate-payment detection is a heuristic, not a guarantee
 

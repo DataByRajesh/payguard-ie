@@ -13,10 +13,11 @@ An internal payments operations, reconciliation, exception-investigation and UAT
 - **Cloud Phase 2.3**: the audit trail's actor is now a real `User` foreign key, not a free-text name — a migration (`scripts/backfill-audit-actor.ts`) moved existing history across, and a seeded service-account user attributes machine-driven events.
 - **Cloud Phase 2.4**: evidence can now be a real uploaded file, not just a text reference — `lib/evidence-storage/` provides a local-filesystem adapter (dev/CI) and a Vercel Blob adapter (the public demo), with a 10MB size cap and MIME allow-list.
 - **Cloud Phase 2.5**: every mutating action is now rate-limited per user (`lib/rate-limit.ts`, Postgres-backed so it works correctly across serverless instances) and every server-side error is logged as structured JSON (`lib/logger.ts`) instead of ad hoc `console.error`.
+- **Cloud Phase 2.6**: a backup/recovery runbook ([docs/BACKUP_AND_RECOVERY.md](docs/BACKUP_AND_RECOVERY.md)) and a final documentation consolidation pass across the Cloud Phase 2 program — authentication, authorization, audit-actor identity, evidence storage, and rate limiting/logging.
 
-Per-sprint delivery detail: [SPRINT1_SUMMARY.md](SPRINT1_SUMMARY.md), [SPRINT2_SUMMARY.md](SPRINT2_SUMMARY.md), [SPRINT3_SUMMARY.md](SPRINT3_SUMMARY.md), [SPRINT4_SUMMARY.md](SPRINT4_SUMMARY.md). System-wide docs: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/DATA_MODEL.md](docs/DATA_MODEL.md), [docs/TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md), [docs/SECURITY_AND_LIMITATIONS.md](docs/SECURITY_AND_LIMITATIONS.md), [docs/LOCAL_POSTGRES_SETUP.md](docs/LOCAL_POSTGRES_SETUP.md), [docs/CLOUD_DEPLOYMENT.md](docs/CLOUD_DEPLOYMENT.md).
+Per-sprint delivery detail: [SPRINT1_SUMMARY.md](SPRINT1_SUMMARY.md), [SPRINT2_SUMMARY.md](SPRINT2_SUMMARY.md), [SPRINT3_SUMMARY.md](SPRINT3_SUMMARY.md), [SPRINT4_SUMMARY.md](SPRINT4_SUMMARY.md). System-wide docs: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/DATA_MODEL.md](docs/DATA_MODEL.md), [docs/TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md), [docs/SECURITY_AND_LIMITATIONS.md](docs/SECURITY_AND_LIMITATIONS.md), [docs/LOCAL_POSTGRES_SETUP.md](docs/LOCAL_POSTGRES_SETUP.md), [docs/CLOUD_DEPLOYMENT.md](docs/CLOUD_DEPLOYMENT.md), [docs/BACKUP_AND_RECOVERY.md](docs/BACKUP_AND_RECOVERY.md).
 
-Built with Next.js (App Router), TypeScript, Tailwind CSS, Prisma + PostgreSQL, Zod, Vitest and Playwright. No AI features, external APIs, role-based authorization, or automatic payment submission are implemented.
+Built with Next.js (App Router), TypeScript, Tailwind CSS, Prisma + PostgreSQL, Zod, Vitest and Playwright. No AI features, external APIs, or automatic payment submission are implemented.
 
 ## Requirements
 
@@ -63,6 +64,7 @@ Connection string lives in `.env` (`DATABASE_URL="postgresql://payguard:payguard
 | `pnpm test:watch` | Vitest in watch mode |
 | `pnpm test:e2e` | Run the Playwright smoke suite against a prebuilt server and a separate `payguard_test` database (auto-migrated and seeded first) |
 | `pnpm demo:reset` | Wipe and re-seed `payguard_dev` back to the same deterministic demo dataset — safe to run any time, including after clicking around and mutating data |
+| `pnpm db:backup` | Manual `pg_dump` snapshot to a gitignored `./backups/` directory — see [docs/BACKUP_AND_RECOVERY.md](docs/BACKUP_AND_RECOVERY.md) |
 
 ## Architecture notes
 

@@ -55,3 +55,6 @@ next-env.d.ts
 
 # local evidence file storage (Cloud Phase 2.4) -- dev/CI only, never the public demo
 /.data
+
+# manual pg_dump output (scripts/db-backup.ts, Cloud Phase 2.6) -- may contain data, never commit
+/backups
