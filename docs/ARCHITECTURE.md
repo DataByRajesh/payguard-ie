@@ -1,6 +1,6 @@
 # Architecture
 
-PayGuard IE is a Next.js 16 App Router application with no separate backend service — Server Components read data directly through Prisma, and Server Actions handle every mutation. There is no message queue, no microservice boundary and no external API; everything runs in one Node process against one SQLite file.
+PayGuard IE is a Next.js 16 App Router application with no separate backend service — Server Components read data directly through Prisma, and Server Actions handle every mutation. There is no message queue, no microservice boundary and no external API; everything runs in one Node process against a PostgreSQL database (local via Docker Compose, cloud via a managed Postgres provider — see [LOCAL_POSTGRES_SETUP.md](LOCAL_POSTGRES_SETUP.md)).
 
 ## Layering
 
@@ -13,7 +13,7 @@ flowchart TD
     Service["Orchestration / service layer<br/>lib/reconciliation-engine/service.ts<br/>lib/exception-workflow/service.ts<br/>lib/uat-workflow/service.ts"]
     Domain["Pure domain layer<br/>lib/reconciliation-engine/rules/*.ts<br/>lib/exception-workflow/{stateMachine,sla,resolution,approval}.ts<br/>zero Prisma/React/Next imports"]
     Persistence["Persistence layer<br/>lib/*/persistence.ts, lib/queries/*.ts<br/>the only files that import lib/db"]
-    DB[("SQLite<br/>prisma/dev.db")]
+    DB[("PostgreSQL<br/>local: Docker Compose<br/>cloud: managed provider")]
 
     UI --> Actions
     Actions --> Service
@@ -41,9 +41,9 @@ All three follow the identical four-layer shape above — once you understand on
 
 There is no login anywhere in this application. `lib/acting-user.ts` reads a plain cookie (`payguard_acting_user_id`) to determine which seeded `User` row every mutation should be attributed to, defaulting to the first active user if the cookie is missing or points at an inactive/deleted user. This is an explicit, labelled stand-in (a "Demo data" badge and an "Acting as" selector are always visible in the header) — see [SECURITY_AND_LIMITATIONS.md](SECURITY_AND_LIMITATIONS.md) for what this means and doesn't mean.
 
-## Persistence: SQLite via a driver adapter
+## Persistence: PostgreSQL via a driver adapter
 
-Prisma 7 generates a client into `app/generated/prisma` and is instantiated through `@prisma/adapter-better-sqlite3` (`lib/db.ts`) rather than Prisma's older binary-engine model. `better-sqlite3` is synchronous and file-based — there is no connection pool, no separate database server, and the entire dataset lives in one `.db` file per environment (`prisma/dev.db` for interactive use, `prisma/test.db` for Playwright, `prisma/vitest.db` for Vitest integration tests — see [DATA_MODEL.md](DATA_MODEL.md) and [TESTING_STRATEGY.md](TESTING_STRATEGY.md)).
+Prisma 7 generates a client into `app/generated/prisma` and is instantiated through `@prisma/adapter-pg` (`lib/db.ts`) rather than Prisma's older binary-engine model — a thin wrapper over `pg`'s connection pool, so it behaves identically against local Docker Postgres and a cloud managed Postgres, no branching by environment. Locally, one Postgres instance (`docker-compose.yml`) hosts three isolated databases — `payguard_dev` for interactive use, `payguard_test` for Playwright, `payguard_vitest` for Vitest integration tests — see [LOCAL_POSTGRES_SETUP.md](LOCAL_POSTGRES_SETUP.md), [DATA_MODEL.md](DATA_MODEL.md) and [TESTING_STRATEGY.md](TESTING_STRATEGY.md).
 
 ## Routing map
 

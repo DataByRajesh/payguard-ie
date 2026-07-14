@@ -1,5 +1,5 @@
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-import { PrismaClient, type Customer, type Payment, type PaymentStatus, type Settlement, type SettlementStatus } from "../app/generated/prisma/client";
+import type { Customer, Payment, PaymentStatus, Settlement, SettlementStatus } from "../app/generated/prisma/client";
+import { prisma } from "../lib/db";
 import { runReconciliation } from "../lib/reconciliation-engine/service";
 import {
   assignException,
@@ -28,8 +28,6 @@ import {
   makeReference,
 } from "./seed-helpers";
 
-const adapter = new PrismaBetterSqlite3({ url: process.env.DATABASE_URL ?? "file:./prisma/dev.db" });
-const prisma = new PrismaClient({ adapter });
 const rng = createRng(42);
 const now = new Date();
 const MS_PER_DAY_LOCAL = 24 * 60 * 60 * 1000;

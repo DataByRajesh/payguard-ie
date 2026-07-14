@@ -5,53 +5,59 @@ An internal payments operations, reconciliation, exception-investigation and UAT
 - **Sprint 1**: project foundation plus fully functional Payments and Settlements areas.
 - **Sprint 2**: a deterministic reconciliation engine — seven rules evaluated against every payment/settlement, stored results, idempotent exception creation, and functional `/reconciliation` (+ run detail) and `/exceptions` (+ case detail) pages.
 - **Sprint 3**: the full exception investigation/resolution/approval workflow (assignment, typed notes, root-cause analysis, resolution, independent-review approval/rejection, SLA tracking, evidence, optimistic concurrency, full audit trail) and a UAT workspace (`/uat`, `/uat/[id]`) with manual-only exception linking.
-- **Sprint 4**: live `/reports` exports (Markdown/CSV/print-friendly HTML across four report types), a real audit timeline on `/payments/[id]` (retiring the last Sprint 1 placeholder), one-command demo reset (`npm run demo:reset`), and a full documentation pass.
+- **Sprint 4**: live `/reports` exports (Markdown/CSV/print-friendly HTML across four report types), a real audit timeline on `/payments/[id]` (retiring the last Sprint 1 placeholder), one-command demo reset (`pnpm demo:reset`), and a full documentation pass.
+- **Cloud Phase 1A**: migrated local development from SQLite to PostgreSQL (Docker Compose), switched the package manager to pnpm — local/test/cloud environments now run the same database engine. See [docs/LOCAL_POSTGRES_SETUP.md](docs/LOCAL_POSTGRES_SETUP.md).
+- **Cloud Phase 1B**: public Vercel demo deployment — isolated Preview/Production Postgres databases, migrations applied automatically on deploy, and a `DEMO_READ_ONLY` flag that disables every mutating action (including reconciliation execution) for the public, unauthenticated demo. See [docs/CLOUD_DEPLOYMENT.md](docs/CLOUD_DEPLOYMENT.md).
 
-Per-sprint delivery detail: [SPRINT1_SUMMARY.md](SPRINT1_SUMMARY.md), [SPRINT2_SUMMARY.md](SPRINT2_SUMMARY.md), [SPRINT3_SUMMARY.md](SPRINT3_SUMMARY.md), [SPRINT4_SUMMARY.md](SPRINT4_SUMMARY.md). System-wide docs: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/DATA_MODEL.md](docs/DATA_MODEL.md), [docs/TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md), [docs/SECURITY_AND_LIMITATIONS.md](docs/SECURITY_AND_LIMITATIONS.md).
+Per-sprint delivery detail: [SPRINT1_SUMMARY.md](SPRINT1_SUMMARY.md), [SPRINT2_SUMMARY.md](SPRINT2_SUMMARY.md), [SPRINT3_SUMMARY.md](SPRINT3_SUMMARY.md), [SPRINT4_SUMMARY.md](SPRINT4_SUMMARY.md). System-wide docs: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/DATA_MODEL.md](docs/DATA_MODEL.md), [docs/TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md), [docs/SECURITY_AND_LIMITATIONS.md](docs/SECURITY_AND_LIMITATIONS.md), [docs/LOCAL_POSTGRES_SETUP.md](docs/LOCAL_POSTGRES_SETUP.md), [docs/CLOUD_DEPLOYMENT.md](docs/CLOUD_DEPLOYMENT.md).
 
-Built with Next.js (App Router), TypeScript, Tailwind CSS, Prisma + SQLite, Zod, Vitest and Playwright. No AI features, external APIs, authentication or automatic payment submission are implemented.
+Built with Next.js (App Router), TypeScript, Tailwind CSS, Prisma + PostgreSQL, Zod, Vitest and Playwright. No AI features, external APIs, authentication or automatic payment submission are implemented.
 
 ## Requirements
 
 - Node.js 20.9+ (Next.js 16 minimum)
-- npm
+- pnpm
+- Docker (for local Postgres)
 
 ## Setup
 
 ```bash
-npm install
+pnpm install
 cp .env.example .env
-npm run db:migrate
-npm run db:seed
-npm run dev
+pnpm db:local:start   # starts local Postgres via Docker Compose
+pnpm db:migrate
+pnpm db:seed
+pnpm dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) — it redirects to `/dashboard`.
 
 ## Database
 
-This project uses Prisma with a local SQLite database (`prisma/dev.db`, gitignored). Prisma Client is generated into `app/generated/prisma` and accessed via a `better-sqlite3` driver adapter (`lib/db.ts`), per Prisma 7's driver-adapter-based client generation.
+This project uses Prisma against PostgreSQL — locally via Docker Compose (`docker-compose.yml`), in the cloud via a managed Postgres provider (Phase 1B). Prisma Client is generated into `app/generated/prisma` and accessed via a `@prisma/adapter-pg` driver adapter (`lib/db.ts`), per Prisma 7's driver-adapter-based client generation. Full setup, database layout and troubleshooting: **[docs/LOCAL_POSTGRES_SETUP.md](docs/LOCAL_POSTGRES_SETUP.md)**.
 
-- `npm run db:migrate` — apply schema migrations to your local dev database (`prisma/dev.db`)
-- `npm run db:seed` — (re)seed the database with ~50 synthetic payments covering every reconciliation scenario (matched, missing settlement, amount/currency mismatch, duplicate payment, delayed settlement, stuck/pending, invalid status combination, failed payment), plus settlements, UAT test cases/executions/evidence, and 11 users (2 deliberately inactive, to demonstrate that inactive users can't be assigned). The seed script then runs the **real reconciliation engine** against that data (the same code path the UI's "Run reconciliation" button calls), so the resulting `ReconciliationRun`, `ReconciliationResult` and `ExceptionCase` rows are genuinely engine-generated, not hand-authored. A representative slice of those exceptions is then driven through the real Sprint 3 workflow service functions (assign → investigate → root cause → resolve → approve/reject) to produce every required demo scenario — see [docs/EXCEPTION_LIFECYCLE.md](docs/EXCEPTION_LIFECYCLE.md#seed-data). Safe to re-run — it clears existing data first.
-- `npm run db:reset` — drop and recreate the database from scratch, then re-seed
-- `npm run db:studio` — open Prisma Studio to browse the data
+- `pnpm db:local:start` / `pnpm db:local:stop` — start/stop the local Postgres container
+- `pnpm db:migrate` — apply schema migrations to your local dev database (`payguard_dev`)
+- `pnpm db:seed` — (re)seed the database with ~50 synthetic payments covering every reconciliation scenario (matched, missing settlement, amount/currency mismatch, duplicate payment, delayed settlement, stuck/pending, invalid status combination, failed payment), plus settlements, UAT test cases/executions/evidence, and 11 users (2 deliberately inactive, to demonstrate that inactive users can't be assigned). The seed script then runs the **real reconciliation engine** against that data (the same code path the UI's "Run reconciliation" button calls), so the resulting `ReconciliationRun`, `ReconciliationResult` and `ExceptionCase` rows are genuinely engine-generated, not hand-authored. A representative slice of those exceptions is then driven through the real Sprint 3 workflow service functions (assign → investigate → root cause → resolve → approve/reject) to produce every required demo scenario — see [docs/EXCEPTION_LIFECYCLE.md](docs/EXCEPTION_LIFECYCLE.md#seed-data). Not idempotent against existing data — reset first if re-running against a non-empty database.
+- `pnpm db:reset` — drop and recreate the database from scratch, then re-seed
+- `pnpm db:studio` — open Prisma Studio to browse the data
 
-Connection string lives in `.env` (`DATABASE_URL="file:./prisma/dev.db"`). See `.env.example` for the template. `prisma.config.ts` is Prisma 7's config file (schema/migration paths, seed command); it replaces the datasource `url` that used to live directly in `schema.prisma`.
+Connection string lives in `.env` (`DATABASE_URL="postgresql://payguard:payguard@localhost:5432/payguard_dev"`). See `.env.example`, `.env.local.example`, `.env.test.example` and `.env.production.example` for the per-environment templates. `prisma.config.ts` is Prisma 7's config file (schema/migration paths, seed command); it replaces the datasource `url` that used to live directly in `schema.prisma`.
 
 ## Scripts
 
 | Command | Purpose |
 | --- | --- |
-| `npm run dev` | Start the dev server |
-| `npm run build` | Production build |
-| `npm run start` | Run the production build |
-| `npm run lint` | ESLint |
-| `npm run typecheck` | `tsc --noEmit` |
-| `npm test` | Run Vitest unit + integration tests once (provisions a disposable `prisma/vitest.db` first via the `pretest` script) |
-| `npm run test:watch` | Vitest in watch mode |
-| `npm run test:e2e` | Run the Playwright smoke suite against a prebuilt server and a separate `prisma/test.db` (auto-migrated and seeded first) |
-| `npm run demo:reset` | Wipe and re-seed `prisma/dev.db` back to the same deterministic demo dataset — safe to run any time, including after clicking around and mutating data |
+| `pnpm dev` | Start the dev server |
+| `pnpm build` | Production build |
+| `pnpm start` | Run the production build |
+| `pnpm lint` | ESLint |
+| `pnpm typecheck` | `tsc --noEmit` |
+| `pnpm db:local:start` / `pnpm db:local:stop` | Start/stop local Postgres (Docker Compose) |
+| `pnpm test` | Run Vitest unit + integration tests once (provisions a disposable `payguard_vitest` database first via the `pretest` script) |
+| `pnpm test:watch` | Vitest in watch mode |
+| `pnpm test:e2e` | Run the Playwright smoke suite against a prebuilt server and a separate `payguard_test` database (auto-migrated and seeded first) |
+| `pnpm demo:reset` | Wipe and re-seed `payguard_dev` back to the same deterministic demo dataset — safe to run any time, including after clicking around and mutating data |
 
 ## Architecture notes
 
@@ -76,7 +82,7 @@ A deterministic engine (`lib/reconciliation-engine/`) evaluates seven rules agai
 
 **Idempotency**: re-running reconciliation against unchanged data never creates duplicate open exceptions. Each failed rule evaluation computes a deterministic dedupe key; an existing *open* (non-resolved/closed) exception with that key gets the new result linked and its `lastDetectedAt` bumped instead of a new row. Full detail in the docs page above.
 
-**Local workflow**: `npm run dev`, open `/reconciliation`, click "Run reconciliation". The run summary, run history, and a full results table (with links to the underlying payment, settlement and any generated exception) update immediately. `/exceptions` is a filterable queue (type/severity/status/SLA state/payment reference) with a detail page showing the triggering reconciliation result, audit timeline, comments and evidence.
+**Local workflow**: `pnpm dev`, open `/reconciliation`, click "Run reconciliation". The run summary, run history, and a full results table (with links to the underlying payment, settlement and any generated exception) update immediately. `/exceptions` is a filterable queue (type/severity/status/SLA state/payment reference) with a detail page showing the triggering reconciliation result, audit timeline, comments and evidence.
 
 **Known limitations**: no pagination (loads all payments per run — fine at this project's scale), sequential (not batched) persistence writes, no auth on the run action (there is no auth anywhere in the app yet). Full list in `docs/RECONCILIATION_RULES.md`.
 
@@ -94,13 +100,13 @@ The exceptions an engine run creates are no longer read-only: `/exceptions/[id]`
 
 `/reports` offers four live report types — Reconciliation Run Summary, Exception Queue Report, UAT Summary Report, Payments & Settlements Summary — each downloadable as Markdown, CSV, or viewed as a print-friendly HTML page (`/reports/[type]?format=markdown|csv|html`). Every figure is computed by calling the same query/service functions the interactive pages use (`lib/reports/data.ts`), so a report can never disagree with what's shown on screen. There is no scheduling, storage, or templating — reports are generated fresh from the current database state on every request.
 
-A permanent "Demo data" badge in the header makes clear this environment is synthetic. Run `npm run demo:reset` at any point to wipe and re-seed `prisma/dev.db` back to the same deterministic starting dataset, regardless of how much you've clicked around and mutated in between.
+A permanent "Demo data" badge in the header makes clear this environment is synthetic. Run `pnpm demo:reset` at any point to wipe and re-seed `payguard_dev` back to the same deterministic starting dataset, regardless of how much you've clicked around and mutated in between.
 
 ## Testing
 
 - **Unit tests** (`lib/**/*.test.ts`, Vitest): currency formatting/rounding, status-badge presentation coverage for every enum value, every branch of the settlement-status derivation logic, every reconciliation rule's positive/negative/boundary/missing-data cases plus dedupe-fingerprint and run-summary aggregation logic, and the full Sprint 3 exception-workflow domain layer (state machine transitions, SLA state calculation, resolution/approval/rejection readiness, UAT release recommendation).
-- **Service-layer integration tests** (`lib/exception-workflow/service.test.ts`, Vitest): run against a real, disposable SQLite database (`prisma/vitest.db`, provisioned fresh by the `pretest` script — never your dev database) rather than mocking Prisma, because the behaviour under test (optimistic-concurrency conflicts, transactional audit-event writes, the full assign→investigate→root-cause→resolve→evidence→approve path with a real audit trail, reviewer-separation/evidence/root-cause validation, reject-and-reopen) only exists at the Prisma boundary.
-- **E2E tests** (`tests/e2e/*.spec.ts`, Playwright), against a dedicated `prisma/test.db` so they never touch your interactive dev database:
+- **Service-layer integration tests** (`lib/exception-workflow/service.test.ts`, Vitest): run against a real, disposable Postgres database (`payguard_vitest`, provisioned fresh by the `pretest` script — never your dev database) rather than mocking Prisma, because the behaviour under test (optimistic-concurrency conflicts, transactional audit-event writes, the full assign→investigate→root-cause→resolve→evidence→approve path with a real audit trail, reviewer-separation/evidence/root-cause validation, reject-and-reopen) only exists at the Prisma boundary.
+- **E2E tests** (`tests/e2e/*.spec.ts`, Playwright), against a dedicated `payguard_test` database so they never touch your interactive dev database:
   - `smoke.spec.ts` — dashboard navigation, payments list + status filter round-trip, payment detail navigation, settlements list rendering.
   - `reconciliation.spec.ts` — run reconciliation, open the run detail, follow a result to its linked exception, re-run reconciliation and confirm no duplicate open exceptions are created; exceptions list filtering.
   - `exception-lifecycle.spec.ts` — the full assign → investigate → note → root cause → evidence → resolve → independent-user approval journey with an audit-trail assertion; a separate resolve-then-reject journey; exceptions-list status/unassigned filtering.

@@ -1,6 +1,6 @@
 # Data Model
 
-Twelve Prisma models (`prisma/schema.prisma`), all backing one SQLite database. IDs are `cuid()` strings throughout; there is no auto-increment integer PK anywhere in the schema.
+Twelve Prisma models (`prisma/schema.prisma`), all backing one PostgreSQL database ([LOCAL_POSTGRES_SETUP.md](LOCAL_POSTGRES_SETUP.md)). IDs are `cuid()` strings throughout; there is no auto-increment integer PK anywhere in the schema.
 
 ## Core payments/settlements
 
@@ -12,7 +12,7 @@ Twelve Prisma models (`prisma/schema.prisma`), all backing one SQLite database. 
 
 ## Reconciliation engine (Sprint 2)
 
-- **`ReconciliationRun`** — one row per "Run reconciliation" click. Denormalized aggregate counts (`totalPayments`, `passedCount`, `failedCount`, `exceptionsCreated`) plus `countsByRule`/`countsBySeverity` stored as JSON strings (SQLite has no native JSON column in this Prisma setup) — computed once at run completion so the run-history list never re-aggregates on read.
+- **`ReconciliationRun`** — one row per "Run reconciliation" click. Denormalized aggregate counts (`totalPayments`, `passedCount`, `failedCount`, `exceptionsCreated`) plus `countsByRule`/`countsBySeverity` stored as JSON strings (kept as `String` rather than migrated to Postgres's native `Json` type, to avoid touching working reconciliation-engine code as part of the Postgres migration — see [SECURITY_AND_LIMITATIONS.md](SECURITY_AND_LIMITATIONS.md)) — computed once at run completion so the run-history list never re-aggregates on read.
 - **`ReconciliationResult`** — one row per `(payment, rule)` evaluation on a given run, `passed: false` rows optionally linking to the `ExceptionCase` they created or re-linked to. Indexed on `paymentId`, `reconciliationRunId`, `exceptionCaseId` — all three are read on the payment detail page, the run detail page, and the exception detail page respectively.
 
 See [RECONCILIATION_RULES.md](RECONCILIATION_RULES.md) for what each rule actually evaluates.
@@ -46,4 +46,4 @@ Currency (`EUR`/`GBP`) and payment method are **plain validated strings** (`lib/
 
 ## Migrations
 
-`prisma/migrations/` is append-only history, one migration per schema-changing commit — there is no squashing. `npm run db:migrate` (`prisma migrate dev`) is the interactive dev-loop command; `prisma migrate deploy` (used by the test/demo setup scripts) applies existing migrations without generating new ones, which is why those scripts never touch `schema.prisma`.
+`prisma/migrations/` is append-only history, one migration per schema-changing commit — there is no squashing. `pnpm db:migrate` (`prisma migrate dev`) is the interactive dev-loop command; `prisma migrate deploy` (used by the test/demo setup scripts) applies existing migrations without generating new ones, which is why those scripts never touch `schema.prisma`.

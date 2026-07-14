@@ -1,12 +1,14 @@
 # Security and Limitations
 
-PayGuard IE is a **portfolio project**, not a production payments system. This document is the single place that consolidates every deliberate scope boundary mentioned elsewhere in the docs, so it's clear what's a real design decision versus what's simply out of scope for a project with no production deployment target.
+PayGuard IE is a **portfolio project**, not a production payments system — the public Vercel demo ([CLOUD_DEPLOYMENT.md](CLOUD_DEPLOYMENT.md)) exists to showcase it, not to operate real payments infrastructure. This document is the single place that consolidates every deliberate scope boundary mentioned elsewhere in the docs, so it's clear what's a real design decision versus what's simply out of scope.
 
 ## No authentication
 
 There is no login, session, password, or identity provider anywhere in this codebase. `lib/acting-user.ts` reads a plain, unsigned cookie (`payguard_acting_user_id`) to decide which seeded `User` row every mutation is attributed to, falling back to the first active seeded user if the cookie is missing or points at an inactive/deleted one. The header's "Acting as" selector and permanent "Demo data" badge ([AppShell.tsx](../components/layout/AppShell.tsx)) exist specifically so this is never mistaken for real access control — anyone with network access to the app can act as any seeded user, including approving their own resolutions by simply switching the selector (the "approver must differ from resolver" rule, [EXCEPTION_LIFECYCLE.md#approval-and-closure](EXCEPTION_LIFECYCLE.md#approval-and-closure), only prevents doing so *without* switching).
 
 **Consequence:** no Server Action in this codebase performs an authorization check ("is this actor allowed to do this?") — only validation checks ("is this input well-formed, is this state transition legal?"). A production version of this system would need real authentication plus role-based authorization on every mutation, none of which exists here.
+
+**Cloud mitigation, not a fix:** the public Vercel demo runs with `DEMO_READ_ONLY=true` ([CLOUD_DEPLOYMENT.md](CLOUD_DEPLOYMENT.md)), which makes every mutating Server Action a no-op regardless of who "acts as" whom. This closes the actual risk of the missing-authorization problem above (anyone mutating the public demo's data) without solving it — it's a blanket read-only switch, not authorization. Local development never sets this flag, so the full interactive workflow (including the acting-user caveats described above) is only ever exercised locally or in CI, never on the public demo.
 
 ## No real payment rails or external connectivity
 
@@ -28,9 +30,9 @@ There is no message queue, no background jobs/cron, no outbound HTTP calls, no f
 
 Both the reconciliation engine (loads every payment per run) and the reports exports (loads every row of the requested type) run unpaginated queries. This is fine at this project's seed-data scale (dozens–hundreds of rows) and would need batching/streaming before it could handle real production volume — see [RECONCILIATION_RULES.md#known-limitations-engine-wide](RECONCILIATION_RULES.md#known-limitations-engine-wide).
 
-## Single-file SQLite, no backup/replication story
+## Local Postgres, no backup/replication story
 
-`prisma/dev.db` is one file, synchronous, no connection pool, no replica ([ARCHITECTURE.md](ARCHITECTURE.md)). `npm run demo:reset` deletes and recreates it from scratch — deliberately destructive, and deliberately scoped to only ever touch this project's own local SQLite file (never anything outside `prisma/dev.db` and its WAL/journal sidecars). There is no backup, point-in-time recovery, or replication story anywhere in this project, which would be a hard production requirement for any real payments-adjacent system.
+The local Postgres instance (`docker-compose.yml`) is a single, disposable container with no replica ([ARCHITECTURE.md](ARCHITECTURE.md), [LOCAL_POSTGRES_SETUP.md](LOCAL_POSTGRES_SETUP.md)). `pnpm demo:reset` drops and recreates the `payguard_dev` schema from scratch — deliberately destructive, and deliberately scoped to only ever touch that one local database (never a Preview/Production database, and never anything outside the local Docker container). There is no backup, point-in-time recovery, or replication story for the local environment; the cloud environment (Phase 1B) relies on the managed Postgres provider's own backup/PITR guarantees rather than anything this project implements itself.
 
 ## Duplicate-payment detection is a heuristic, not a guarantee
 

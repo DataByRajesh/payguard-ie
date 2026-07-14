@@ -10,6 +10,9 @@ import { test, expect, type Locator, type Page } from "@playwright/test";
  * in manual testing, and never reproduced in the equivalent Vitest service-layer integration
  * tests — see lib/exception-workflow/service.test.ts). `submitAndAwaitStatus` below retries just
  * the click (reloading and re-filling the form first) rather than paying for a whole-test retry.
+ * Since the Cloud Phase 1A migration to Postgres-over-Docker (see docs/LOCAL_POSTGRES_SETUP.md),
+ * this has been somewhat more frequent than under SQLite's in-process, zero-latency writes —
+ * timeouts below are sized with that extra margin.
  */
 async function submitAndAwaitStatus(
   page: Page,
@@ -35,8 +38,8 @@ async function submitAndAwaitStatus(
     }
     try {
       await fillForm();
-      await getButton().click({ timeout: 15000 });
-      await expect(statusLocator).toBeVisible({ timeout: 15000 });
+      await getButton().click({ timeout: 20000 });
+      await expect(statusLocator).toBeVisible({ timeout: 20000 });
       return;
     } catch (error) {
       if (attempt === 3) throw error;
@@ -46,7 +49,7 @@ async function submitAndAwaitStatus(
 }
 
 test("full exception lifecycle: assign through independent approval, with a complete audit trail", async ({ page }) => {
-  test.setTimeout(150000);
+  test.setTimeout(200000);
   await page.goto("/exceptions?status=NEW&unassigned=true");
   const table = page.getByRole("table", { name: "Exceptions" });
   await expect(table).toBeVisible({ timeout: 20000 });
@@ -181,7 +184,7 @@ test("full exception lifecycle: assign through independent approval, with a comp
 });
 
 test("rejecting a resolution reopens the case for further investigation", async ({ page }) => {
-  test.setTimeout(150000);
+  test.setTimeout(200000);
   await page.goto("/exceptions?status=NEW&unassigned=true");
   const table = page.getByRole("table", { name: "Exceptions" });
   const rows = table.locator("tbody tr");
