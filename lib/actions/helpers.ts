@@ -3,6 +3,7 @@ import { ConcurrencyConflictError } from "@/lib/exception-workflow/persistence";
 import { DomainValidationError, ExceptionNotFoundError } from "@/lib/exception-workflow/service";
 import { InvalidTransitionError } from "@/lib/exception-workflow/stateMachine";
 import { InvalidEvidenceFileError } from "@/lib/validation/evidenceFile";
+import { logger } from "@/lib/logger";
 
 export interface ActionResult {
   success: boolean;
@@ -33,6 +34,6 @@ export function mapWorkflowError(error: unknown): ActionResult {
   if (error instanceof InvalidEvidenceFileError) {
     return { success: false, message: error.message };
   }
-  console.error("Exception workflow action failed:", error);
+  logger.error("workflow_action_failed", { error });
   return { success: false, message: "Something went wrong. Check server logs for details." };
 }

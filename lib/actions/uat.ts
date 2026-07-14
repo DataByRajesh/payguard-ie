@@ -7,6 +7,7 @@ import { executeUatCase, addUatEvidence } from "@/lib/uat-workflow/service";
 import { formDataToObject, mapWorkflowError, type ActionResult } from "./helpers";
 import { isDemoReadOnly, demoReadOnlyResult } from "@/lib/demo-mode";
 import { requirePermission } from "@/lib/auth/permissions";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { uploadEvidenceFileIfPresent } from "@/lib/evidence-storage/upload";
 
 export async function executeUatCaseAction(formData: FormData): Promise<ActionResult> {
@@ -16,6 +17,8 @@ export async function executeUatCaseAction(formData: FormData): Promise<ActionRe
     const actor = await getActingUser();
     const denial = requirePermission<ActionResult>(actor, "UAT_EXECUTE");
     if (denial) return denial;
+    const rateLimited = await checkRateLimit<ActionResult>(actor.id, "executeUatCase");
+    if (rateLimited) return rateLimited;
 
     const execution = await executeUatCase({
       testCaseId: input.testCaseId,
@@ -46,6 +49,8 @@ export async function addUatEvidenceAction(formData: FormData): Promise<ActionRe
     const actor = await getActingUser();
     const denial = requirePermission<ActionResult>(actor, "UAT_EVIDENCE");
     if (denial) return denial;
+    const rateLimited = await checkRateLimit<ActionResult>(actor.id, "addUatEvidence");
+    if (rateLimited) return rateLimited;
 
     const upload = await uploadEvidenceFileIfPresent(formData);
     await addUatEvidence({

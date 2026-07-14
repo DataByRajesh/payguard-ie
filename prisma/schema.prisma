@@ -360,6 +360,21 @@ model EvidenceRecord {
   exceptionCase   ExceptionCase? @relation(fields: [exceptionCaseId], references: [id])
 }
 
+/// Postgres-backed fixed-window rate limiter (Cloud Phase 2.5, lib/rate-limit.ts) -- not
+/// in-memory, since an in-process Map silently under-enforces on Vercel's serverless model
+/// (concurrent requests can land on different instances with independent memory). Deliberately
+/// has no FK to User: rows are pruned well before a user could ever be deleted, and the counter
+/// doesn't need to survive a user's deletion the way audit history does.
+model RateLimitCounter {
+  id            String   @id @default(cuid())
+  userId        String
+  action        String
+  windowStartAt DateTime
+  count         Int      @default(0)
+
+  @@unique([userId, action, windowStartAt])
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique

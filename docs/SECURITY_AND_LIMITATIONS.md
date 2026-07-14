@@ -42,6 +42,14 @@ The local Postgres instance (`docker-compose.yml`) is a single, disposable conta
 
 Covered in full in [RECONCILIATION_RULES.md#4-duplicate-payment](RECONCILIATION_RULES.md#4-duplicate-payment): because the schema has no merchant-supplied idempotency key, duplicate detection fingerprints on `(customerId, amountMinor, currency, paymentMethod)` within a time window, which has both false-positive and false-negative failure modes documented there. Flagged here again because it's the limitation most likely to matter if this reconciliation approach were ever adapted for a real system.
 
+## Rate limiting is a fixed window, not sliding (Cloud Phase 2.5)
+
+Every mutating Server Action is rate-limited per user per action via a Postgres-backed counter (`lib/rate-limit.ts`, `RateLimitCounter`) — deliberately not an in-process `Map`, since that would silently under-enforce on Vercel's serverless model, where concurrent requests can land on different instances with independent memory. It's a **fixed** window (e.g. all of `00:00`–`00:59`), not a sliding one: a user can make up to the limit right at the end of one window and again right at the start of the next, allowing a short burst of roughly double the stated limit across a window boundary. This is an accepted, named trade-off at this project's scale, the same "named limitation" style as the reconciliation engine's duplicate-detection heuristic above — a sliding-window or token-bucket algorithm would close it if this were ever adapted for real traffic. Reconciliation runs get a lower limit (5/minute) than other actions (20/minute) since a single run is far more expensive (loads every payment, ~350 sequential writes at this project's seed scale).
+
+## Logs are structured but not centrally aggregated
+
+`lib/logger.ts` emits one JSON line per event (`console.log`), which Vercel's own log viewer parses natively — no logging service dependency. There is no log retention policy, alerting, or aggregation across deployments beyond whatever Vercel's dashboard provides out of the box; a real production system would pair this with a proper log sink (Datadog, Axiom, etc.) for retention and querying beyond Vercel's built-in window.
+
 ## Summary
 
 None of the above is a bug — every item is a named, deliberate scope boundary for a project built to demonstrate architecture and workflow design, not to move real money. If you're evaluating this codebase as a reference for a production system, treat this document as the checklist of what still needs to be built before it could be one.
