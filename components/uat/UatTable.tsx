@@ -15,7 +15,7 @@ export function UatTable({ testCases }: { testCases: UatTestCaseListItem[] }) {
       key: "reference",
       header: "Test case",
       render: (testCase) => (
-        <Link href={`/uat/${testCase.id}`} className="font-medium text-slate-900 underline-offset-2 hover:underline">
+        <Link href={`/uat/${testCase.id}`} prefetch={false} className="font-medium text-slate-900 underline-offset-2 hover:underline">
           {testCase.testCaseRef} — {testCase.title}
         </Link>
       ),

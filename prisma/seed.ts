@@ -1,5 +1,6 @@
 import type { Customer, Payment, PaymentStatus, Settlement, SettlementStatus } from "../app/generated/prisma/client";
 import { prisma } from "../lib/db";
+import { hashPassword } from "../lib/auth/password";
 import { runReconciliation } from "../lib/reconciliation-engine/service";
 import {
   assignException,
@@ -143,10 +144,18 @@ async function main() {
     { name: "Grace Taylor", role: "APP_SUPPORT", isActive: false },
   ] as const;
 
+  // Every seeded user shares one password (Cloud Phase 2.1) so a reviewer can log in as any role
+  // via /login -- see docs/SECURITY_AND_LIMITATIONS.md.
+  const seedPasswordHash = hashPassword(process.env.SEED_USER_PASSWORD ?? "payguard-demo");
+
   const users = [];
   for (const def of userDefs) {
     const email = `${def.name.toLowerCase().replace(/[^a-z]+/g, ".")}@payguard-ie.example`;
-    users.push(await prisma.user.create({ data: { email, name: def.name, role: def.role, isActive: def.isActive } }));
+    users.push(
+      await prisma.user.create({
+        data: { email, name: def.name, role: def.role, isActive: def.isActive, passwordHash: seedPasswordHash },
+      }),
+    );
   }
   const opsAnalysts = users.filter((u) => u.role === "OPS_ANALYST" && u.isActive);
   const uatLeads = users.filter((u) => u.role === "UAT_LEAD" && u.isActive);

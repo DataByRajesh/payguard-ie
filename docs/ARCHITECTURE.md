@@ -9,7 +9,7 @@ Every non-trivial feature (the reconciliation engine, the exception workflow) is
 ```mermaid
 flowchart TD
     UI["UI layer<br/>app/**/page.tsx, components/**<br/>Server Components + Server Actions"]
-    Actions["Server Actions<br/>lib/actions/*.ts<br/>Zod validation, acting-user attribution"]
+    Actions["Server Actions<br/>lib/actions/*.ts<br/>Zod validation, logged-in-user attribution"]
     Service["Orchestration / service layer<br/>lib/reconciliation-engine/service.ts<br/>lib/exception-workflow/service.ts<br/>lib/uat-workflow/service.ts"]
     Domain["Pure domain layer<br/>lib/reconciliation-engine/rules/*.ts<br/>lib/exception-workflow/{stateMachine,sla,resolution,approval}.ts<br/>zero Prisma/React/Next imports"]
     Persistence["Persistence layer<br/>lib/*/persistence.ts, lib/queries/*.ts<br/>the only files that import lib/db"]
@@ -37,9 +37,9 @@ There is no client-side state management (no Redux/Zustand/React Query). Reads a
 
 All three follow the identical four-layer shape above — once you understand one, you understand all three.
 
-## Identity: acting-user, not authentication
+## Identity: signed sessions, not yet authorization
 
-There is no login anywhere in this application. `lib/acting-user.ts` reads a plain cookie (`payguard_acting_user_id`) to determine which seeded `User` row every mutation should be attributed to, defaulting to the first active user if the cookie is missing or points at an inactive/deleted user. This is an explicit, labelled stand-in (a "Demo data" badge and an "Acting as" selector are always visible in the header) — see [SECURITY_AND_LIMITATIONS.md](SECURITY_AND_LIMITATIONS.md) for what this means and doesn't mean.
+Cloud Phase 2.1 added real login: `proxy.ts` (Next.js 16's renamed `middleware.ts` — see its file header) redirects any request without a valid session cookie to `/login`; `lib/actions/auth.ts` verifies a password (`lib/auth/password.ts`, `node:crypto.scrypt`) and issues a signed, stateless session cookie (`lib/auth/session.ts`, HMAC-SHA256, `SESSION_SECRET`). `lib/acting-user.ts` looks up the `User` row for the current session and is what every Server Action attributes its mutation to. Sessions are stateless — revocation only works via `User.isActive`, checked on every request — see [SECURITY_AND_LIMITATIONS.md](SECURITY_AND_LIMITATIONS.md) for that trade-off. There is still no per-role authorization: any logged-in user can perform any action until Cloud Phase 2.2.
 
 ## Persistence: PostgreSQL via a driver adapter
 

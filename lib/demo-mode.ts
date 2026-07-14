@@ -4,9 +4,9 @@
  * while leaving all reads (pages, /reports exports) fully functional. Unset/false everywhere else
  * (local dev, Vitest, Playwright), so this never affects the workflows under test.
  *
- * Deliberately does NOT gate `setActingUserAction` (lib/actions/actingUser.ts) — switching which
- * seeded persona you're viewing as mutates no business data and is part of exploring the read-only
- * demo, not a write workflow this flag is meant to protect.
+ * Deliberately does NOT gate `loginAction`/`logoutAction` (lib/actions/auth.ts) — signing in as a
+ * seeded persona mutates no business data and is part of exploring the read-only demo, not a
+ * write workflow this flag is meant to protect.
  */
 const DEMO_READ_ONLY_MESSAGE =
   "This is a public read-only demo — write actions are disabled here. Clone the repo and run it locally (see README) to try the full workflow.";

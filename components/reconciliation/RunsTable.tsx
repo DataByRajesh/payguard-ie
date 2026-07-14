@@ -16,7 +16,7 @@ export function RunsTable({ runs }: { runs: ReconciliationRun[] }) {
       key: "reference",
       header: "Run reference",
       render: (run) => (
-        <Link href={`/reconciliation/${run.id}`} className="font-medium text-slate-900 underline-offset-2 hover:underline">
+        <Link href={`/reconciliation/${run.id}`} prefetch={false} className="font-medium text-slate-900 underline-offset-2 hover:underline">
           {run.runReference}
         </Link>
       ),

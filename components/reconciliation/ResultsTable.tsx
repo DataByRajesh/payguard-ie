@@ -30,7 +30,7 @@ export function ResultsTable({ results }: { results: ResultRow[] }) {
       key: "payment",
       header: "Payment",
       render: (result) => (
-        <Link href={`/payments/${result.payment.id}`} className="text-slate-700 underline-offset-2 hover:underline">
+        <Link href={`/payments/${result.payment.id}`} prefetch={false} className="text-slate-700 underline-offset-2 hover:underline">
           {result.payment.paymentReference}
         </Link>
       ),
@@ -45,7 +45,7 @@ export function ResultsTable({ results }: { results: ResultRow[] }) {
       header: "Exception",
       render: (result) =>
         result.exceptionCase ? (
-          <Link href={`/exceptions/${result.exceptionCase.id}`} className="text-slate-700 underline-offset-2 hover:underline">
+          <Link href={`/exceptions/${result.exceptionCase.id}`} prefetch={false} className="text-slate-700 underline-offset-2 hover:underline">
             {result.exceptionCase.caseReference}
           </Link>
         ) : (

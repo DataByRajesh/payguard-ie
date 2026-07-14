@@ -25,7 +25,14 @@ export function ExceptionsTable({
       key: "reference",
       header: "Case reference",
       render: (exceptionCase) => (
-        <Link href={`/exceptions/${exceptionCase.id}`} className="font-medium text-slate-900 underline-offset-2 hover:underline">
+        <Link
+          href={`/exceptions/${exceptionCase.id}`}
+          // Every page here is dynamic (reads the session cookie), so prefetching every row's link
+          // can't be cached and starves out the fetch carrying a Server Action's own response
+          // under load -- same reasoning as components/layout/NavLink.tsx.
+          prefetch={false}
+          className="font-medium text-slate-900 underline-offset-2 hover:underline"
+        >
           {exceptionCase.caseReference}
         </Link>
       ),
@@ -39,7 +46,7 @@ export function ExceptionsTable({
       key: "payment",
       header: "Payment",
       render: (exceptionCase) => (
-        <Link href={`/payments/${exceptionCase.paymentId}`} className="text-slate-700 underline-offset-2 hover:underline">
+        <Link href={`/payments/${exceptionCase.paymentId}`} prefetch={false} className="text-slate-700 underline-offset-2 hover:underline">
           {exceptionCase.payment.paymentReference}
         </Link>
       ),

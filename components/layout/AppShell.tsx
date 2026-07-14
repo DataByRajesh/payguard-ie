@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { NavLink } from "@/components/layout/NavLink";
-import { ActingUserSelector } from "@/components/layout/ActingUserSelector";
-import { getAssignableUsers, getActingUser } from "@/lib/acting-user";
+import { getCurrentUserOrNull } from "@/lib/acting-user";
+import { logoutAction } from "@/lib/actions/auth";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard" },
@@ -15,7 +15,13 @@ const NAV_ITEMS = [
 ];
 
 export async function AppShell({ children }: { children: ReactNode }) {
-  const [users, actingUser] = await Promise.all([getAssignableUsers(), getActingUser()]);
+  const currentUser = await getCurrentUserOrNull();
+
+  // No session (e.g. /login) -- proxy.ts already redirects every other route here, so render
+  // bare children with none of the authenticated app chrome below.
+  if (!currentUser) {
+    return <div className="flex min-h-screen flex-col">{children}</div>;
+  }
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -37,7 +43,14 @@ export async function AppShell({ children }: { children: ReactNode }) {
               ))}
             </nav>
           </div>
-          <ActingUserSelector users={users} actingUserId={actingUser.id} />
+          <form action={logoutAction} className="flex items-center gap-2 text-xs">
+            <span className="text-slate-600">
+              {currentUser.name} <span className="text-slate-400">({currentUser.role.replace(/_/g, " ")})</span>
+            </span>
+            <button type="submit" className="rounded-md border border-slate-300 px-2 py-1 text-slate-700 hover:bg-slate-50">
+              Log out
+            </button>
+          </form>
         </div>
       </header>
       <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-6">{children}</main>

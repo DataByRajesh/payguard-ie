@@ -7,11 +7,12 @@ An internal payments operations, reconciliation, exception-investigation and UAT
 - **Sprint 3**: the full exception investigation/resolution/approval workflow (assignment, typed notes, root-cause analysis, resolution, independent-review approval/rejection, SLA tracking, evidence, optimistic concurrency, full audit trail) and a UAT workspace (`/uat`, `/uat/[id]`) with manual-only exception linking.
 - **Sprint 4**: live `/reports` exports (Markdown/CSV/print-friendly HTML across four report types), a real audit timeline on `/payments/[id]` (retiring the last Sprint 1 placeholder), one-command demo reset (`pnpm demo:reset`), and a full documentation pass.
 - **Cloud Phase 1A**: migrated local development from SQLite to PostgreSQL (Docker Compose), switched the package manager to pnpm — local/test/cloud environments now run the same database engine. See [docs/LOCAL_POSTGRES_SETUP.md](docs/LOCAL_POSTGRES_SETUP.md).
-- **Cloud Phase 1B**: public Vercel demo deployment — isolated Preview/Production Postgres databases, migrations applied automatically on deploy, and a `DEMO_READ_ONLY` flag that disables every mutating action (including reconciliation execution) for the public, unauthenticated demo. See [docs/CLOUD_DEPLOYMENT.md](docs/CLOUD_DEPLOYMENT.md).
+- **Cloud Phase 1B**: public Vercel demo deployment — isolated Preview/Production Postgres databases, migrations applied automatically on deploy, and a `DEMO_READ_ONLY` flag that disables every mutating action (including reconciliation execution) for every visitor to the public demo. See [docs/CLOUD_DEPLOYMENT.md](docs/CLOUD_DEPLOYMENT.md).
+- **Cloud Phase 2.1**: real authentication — `/login`, signed session cookies, password-protected seeded users, replacing the old free-switch acting-user selector. See [docs/SECURITY_AND_LIMITATIONS.md](docs/SECURITY_AND_LIMITATIONS.md).
 
 Per-sprint delivery detail: [SPRINT1_SUMMARY.md](SPRINT1_SUMMARY.md), [SPRINT2_SUMMARY.md](SPRINT2_SUMMARY.md), [SPRINT3_SUMMARY.md](SPRINT3_SUMMARY.md), [SPRINT4_SUMMARY.md](SPRINT4_SUMMARY.md). System-wide docs: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/DATA_MODEL.md](docs/DATA_MODEL.md), [docs/TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md), [docs/SECURITY_AND_LIMITATIONS.md](docs/SECURITY_AND_LIMITATIONS.md), [docs/LOCAL_POSTGRES_SETUP.md](docs/LOCAL_POSTGRES_SETUP.md), [docs/CLOUD_DEPLOYMENT.md](docs/CLOUD_DEPLOYMENT.md).
 
-Built with Next.js (App Router), TypeScript, Tailwind CSS, Prisma + PostgreSQL, Zod, Vitest and Playwright. No AI features, external APIs, authentication or automatic payment submission are implemented.
+Built with Next.js (App Router), TypeScript, Tailwind CSS, Prisma + PostgreSQL, Zod, Vitest and Playwright. No AI features, external APIs, role-based authorization, or automatic payment submission are implemented.
 
 ## Requirements
 
@@ -30,7 +31,7 @@ pnpm db:seed
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) — it redirects to `/dashboard`.
+Open [http://localhost:3000](http://localhost:3000) — it redirects to `/login`. Every seeded user shares one password (`SEED_USER_PASSWORD`, default `payguard-demo` locally); the login page lists every seeded email/role so you can sign in as any of them.
 
 ## Database
 
@@ -84,14 +85,14 @@ A deterministic engine (`lib/reconciliation-engine/`) evaluates seven rules agai
 
 **Local workflow**: `pnpm dev`, open `/reconciliation`, click "Run reconciliation". The run summary, run history, and a full results table (with links to the underlying payment, settlement and any generated exception) update immediately. `/exceptions` is a filterable queue (type/severity/status/SLA state/payment reference) with a detail page showing the triggering reconciliation result, audit timeline, comments and evidence.
 
-**Known limitations**: no pagination (loads all payments per run — fine at this project's scale), sequential (not batched) persistence writes, no auth on the run action (there is no auth anywhere in the app yet). Full list in `docs/RECONCILIATION_RULES.md`.
+**Known limitations**: no pagination (loads all payments per run — fine at this project's scale), sequential (not batched) persistence writes, no role-based authorization on the run action (any logged-in user can trigger it — see `docs/SECURITY_AND_LIMITATIONS.md`). Full list in `docs/RECONCILIATION_RULES.md`.
 
 ## Exception workflow and UAT (Sprint 3)
 
 The exceptions an engine run creates are no longer read-only: `/exceptions/[id]` is a full investigation workspace built from the same four-layer architecture as the engine above (`lib/exception-workflow/{types,config,stateMachine,sla,resolution,approval}.ts` pure domain logic → `service.ts` orchestration → `persistence.ts` → `lib/actions/exceptions.ts` Server Actions → UI cards).
 
 - **Lifecycle**: `NEW → ASSIGNED → INVESTIGATING ⇄ AWAITING_INFORMATION → RESOLVED → CLOSED`, with rejection returning `RESOLVED → INVESTIGATING`. Direct closure from any earlier status is structurally impossible — every transition is checked against an explicit allow-list. Full state diagram and every rule (assignment, notes, root cause, resolution readiness, independent-review approval, SLA states, evidence, optimistic concurrency, audit trail): **[docs/EXCEPTION_LIFECYCLE.md](docs/EXCEPTION_LIFECYCLE.md)**.
-- **Acting user**: there is no authentication anywhere in this app. A cookie-backed "Acting as" selector in the header (`components/layout/ActingUserSelector.tsx`) lets you switch between seeded demo users; every mutation is attributed to whoever is currently selected. This is what lets you demonstrate the "approver must differ from resolver" rule locally — submit a resolution as one user, then switch the selector before approving.
+- **Identity**: every mutation is attributed to whoever is currently logged in (Cloud Phase 2.1 — see [docs/SECURITY_AND_LIMITATIONS.md](docs/SECURITY_AND_LIMITATIONS.md)). To demonstrate the "approver must differ from resolver" rule locally, submit a resolution as one seeded user, log out, then log back in as a different one before approving.
 - **Optimistic concurrency**: every exception case carries a `version` column. Every mutating form embeds the version it was loaded with; a second, stale submission (someone else changed it first) is rejected with a clear "reload and try again" message rather than silently overwriting.
 - **UAT workspace**: `/uat` (queue with pass/fail/blocked/not-run summary tiles) and `/uat/[id]` (test case detail, execution history, new-execution form). A failed execution **never** automatically creates an exception case — linking a UAT failure to an existing exception is always a manual, tester-driven choice. Full detail: **[docs/UAT_WORKFLOW.md](docs/UAT_WORKFLOW.md)**.
 - **Dashboard** now reflects live data across all three areas: exception counts (open/unassigned/overdue/due soon/awaiting approval/closed), UAT execution counts, and the latest reconciliation run.

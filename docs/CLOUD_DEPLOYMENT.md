@@ -1,6 +1,6 @@
 # Cloud Deployment (Phase 1B)
 
-This is the runbook for standing up the public PayGuard IE demo on Vercel — a dedicated project, isolated Preview and Production Postgres databases, and the safety guards that make it safe to leave publicly reachable with no authentication. Steps marked **(dashboard/CLI)** need to be done by whoever owns the Vercel account — provisioning a billed resource and completing OAuth login aren't things that can be automated from this repo.
+This is the runbook for standing up the public PayGuard IE demo on Vercel — a dedicated project, isolated Preview and Production Postgres databases, and the safety guards that make it safe to leave publicly reachable behind a shared demo login (Cloud Phase 2.1). Steps marked **(dashboard/CLI)** need to be done by whoever owns the Vercel account — provisioning a billed resource and completing OAuth login aren't things that can be automated from this repo.
 
 ## Why this needs manual steps
 
@@ -27,8 +27,12 @@ Project → **Settings → Environment Variables**. Vercel lets you scope each v
 | --- | --- | --- |
 | `DATABASE_URL` | `payguard-ie-preview` connection string | `payguard-ie-production` connection string |
 | `DEMO_READ_ONLY` | `true` | `true` |
+| `SESSION_SECRET` | a distinct random value (e.g. `openssl rand -base64 32`) | a **different** distinct random value |
+| `SEED_USER_PASSWORD` | the shared demo-login password to seed (step 5) | the shared demo-login password to seed (step 5) |
 
-**`DEMO_READ_ONLY=true` in both.** There is no authentication anywhere in this app (see `docs/SECURITY_AND_LIMITATIONS.md`) — the public demo rules (no real payment submission, reconciliation execution disabled for anonymous visitors, write workflows safely isolated) are all satisfied by one flag: every mutating Server Action (`lib/demo-mode.ts`, wired into `lib/actions/*.ts`) returns a clear "read-only demo" message instead of touching the database when this is set. Local dev, Vitest and Playwright never set it, so the full interactive workflow stays fully testable — only the public deployment is locked down.
+**`DEMO_READ_ONLY=true` in both.** The public demo rules (no real payment submission, reconciliation execution disabled for anonymous visitors, write workflows safely isolated) are all satisfied by one flag: every mutating Server Action (`lib/demo-mode.ts`, wired into `lib/actions/*.ts`) returns a clear "read-only demo" message instead of touching the database when this is set. Local dev, Vitest and Playwright never set it, so the full interactive workflow stays fully testable — only the public deployment is locked down. This is independent of and composes with the login requirement below (Cloud Phase 2.1) — every visitor, logged in or not, hits the same read-only guard on the public deployment.
+
+**`SESSION_SECRET` must be a real, distinct value per environment** — never reuse the local-dev fallback baked into `lib/auth/session.ts`, and never reuse the same value across Preview and Production (a leaked Preview secret would let someone forge a valid Production session cookie). See `docs/SECURITY_AND_LIMITATIONS.md` for what this cookie does and doesn't protect against.
 
 ## 4. First deploy and migrations **(automatic)**
 
@@ -46,11 +50,12 @@ vercel env pull .env.production.local --environment=production
 DATABASE_URL=$(grep DATABASE_URL .env.production.local | cut -d= -f2- | tr -d '"') pnpm exec tsx prisma/seed.ts
 ```
 
-Re-running later re-seeds from empty — reset first (`pnpm exec prisma migrate reset --force` against that `DATABASE_URL`) if the demo data needs restoring to its original state, exactly like `pnpm demo:reset` does locally.
+Re-running later re-seeds from empty — reset first (`pnpm exec prisma migrate reset --force` against that `DATABASE_URL`) if the demo data needs restoring to its original state, exactly like `pnpm demo:reset` does locally. Each seeded user's password is hashed from that environment's `SEED_USER_PASSWORD` (pulled automatically by `vercel env pull` above) — every user shares that one password, as on `/login`.
 
 ## 6. Verify
 
-- Open the Preview and Production URLs; confirm `/dashboard`, `/payments`, `/exceptions`, `/reports` all render seeded data.
+- Open the Preview and Production URLs; confirm you're redirected to `/login`, and that logging in with any seeded user's email + the environment's `SEED_USER_PASSWORD` succeeds and reaches `/dashboard`.
+- Confirm `/dashboard`, `/payments`, `/exceptions`, `/reports` all render seeded data.
 - Confirm the read-only guard: attempt any mutation (e.g. "Run reconciliation") and confirm it returns the "read-only demo" message rather than actually running.
 - Confirm `/reports/*` exports still work (they're reads, unaffected by `DEMO_READ_ONLY`) and don't expose raw database IDs — every export column uses human-readable reference codes (`caseReference`, `paymentReference`, etc.), never a Prisma `id`.
 

@@ -33,6 +33,7 @@ export function ExceptionCasePanel({ exceptionCases }: { exceptionCases: Excepti
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <Link
                   href={`/exceptions/${exceptionCase.id}`}
+                  prefetch={false}
                   className="text-sm font-medium text-slate-800 underline-offset-2 hover:underline"
                 >
                   {exceptionCase.caseReference} — {exceptionCase.title}

@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 import { config as loadEnv } from "dotenv";
 import path from "node:path";
+import { AUTH_FILE } from "./tests/e2e/auth-storage-state";
 
 loadEnv({ path: path.resolve(__dirname, ".env.test") });
 
@@ -31,5 +32,13 @@ export default defineConfig({
       DATABASE_URL: process.env.DATABASE_URL ?? "postgresql://payguard:payguard@localhost:5432/payguard_test",
     },
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "setup", testMatch: /auth\.setup\.ts/ },
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"], storageState: AUTH_FILE },
+      dependencies: ["setup"],
+      testIgnore: /auth\.setup\.ts/,
+    },
+  ],
 });

@@ -34,9 +34,9 @@ See [RECONCILIATION_RULES.md](RECONCILIATION_RULES.md) for what each rule actual
 
 ## Identity
 
-- **`User`** — seeded only; no sign-up/login flow. `isActive` gates both the acting-user selector and exception assignment (an inactive user can't be assigned or act). Eight named relations back onto `ExceptionCase`/`ExceptionComment`/`EvidenceRecord`/`UATExecution`, reflecting every place a user can be "the actor" for something in this schema.
+- **`User`** — seeded only; no sign-up flow, but real login as of Cloud Phase 2.1 (`passwordHash`, checked by `lib/actions/auth.ts`). `isActive` gates login, exception assignment, and acting as anyone (an inactive user can't log in, be assigned, or act). Eight named relations back onto `ExceptionCase`/`ExceptionComment`/`EvidenceRecord`/`UATExecution`, reflecting every place a user can be "the actor" for something in this schema.
 
-See [SECURITY_AND_LIMITATIONS.md](SECURITY_AND_LIMITATIONS.md) for what the absence of real authentication means for this model.
+See [SECURITY_AND_LIMITATIONS.md](SECURITY_AND_LIMITATIONS.md) for what's still missing (authorization, secure evidence storage) even with real login in place.
 
 ## Enums
 
