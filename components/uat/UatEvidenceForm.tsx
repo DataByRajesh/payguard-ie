@@ -49,6 +49,13 @@ export function UatEvidenceForm({ executionId }: { executionId: string }) {
         placeholder="Reference / URL / internal path (optional)"
         className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
       />
+      <input
+        name="file"
+        type="file"
+        aria-label="Attach a file (optional, max 10MB)"
+        accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain,text/csv,application/json"
+        className="w-full text-xs text-slate-600"
+      />
       <div className="flex items-center gap-3">
         <button
           type="submit"

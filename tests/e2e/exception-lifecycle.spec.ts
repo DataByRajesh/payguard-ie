@@ -1,5 +1,8 @@
+import path from "node:path";
 import { test, expect, type Locator, type Page } from "@playwright/test";
 import { loginAsEmail } from "./fixtures/auth";
+
+const EVIDENCE_FIXTURE_PATH = path.resolve(__dirname, "fixtures/evidence-sample.txt");
 
 // Matches auth.setup.ts's storageState identity (the default logged-in user for every spec) and
 // a second seeded user, both OPS_ANALYST, to demonstrate the "approver must differ from resolver"
@@ -137,18 +140,21 @@ test("full exception lifecycle: assign through independent approval, with a comp
   // Approval requires independent review — attempting to approve as the resolver should be blocked.
   await expect(page.getByText("Log in as a different demo user")).toBeVisible({ timeout: 20000 });
 
-  // Attach evidence (required before the case can be closed).
+  // Attach evidence (required before the case can be closed), including a real uploaded file
+  // (Cloud Phase 2.4) exercised through the local evidence storage adapter.
   await submitAndAwaitStatus(
     page,
     detailUrl,
     async () => {
       await page.locator("#evidenceType").selectOption("QUERY_RESULT");
       await page.getByLabel("Title").fill("Replacement settlement file confirmation");
+      await page.setInputFiles('input[name="file"]', EVIDENCE_FIXTURE_PATH);
     },
     () => page.getByRole("button", { name: "Add evidence" }),
     /Evidence added/i,
   );
   await page.goto(detailUrl);
+  await expect(page.getByRole("link", { name: "View uploaded file" }).first()).toBeVisible({ timeout: 20000 });
 
   // Log in as a different seeded user than the resolver, then approve and close.
   await loginAsEmail(page, OTHER_APPROVER_EMAIL);

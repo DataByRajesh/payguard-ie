@@ -121,6 +121,14 @@ enum EvidenceType {
   OTHER
 }
 
+/// Where an uploaded evidence file's bytes actually live (Cloud Phase 2.4) -- LOCAL for
+/// dev/CI/self-hosted, VERCEL_BLOB for the public Preview/Production demo. Null on rows that only
+/// ever had a free-text fileReference (a URL/path pointer, not a real upload).
+enum EvidenceStorageProvider {
+  LOCAL
+  VERCEL_BLOB
+}
+
 model Customer {
   id          String   @id @default(cuid())
   customerRef String   @unique
@@ -331,16 +339,20 @@ model UATExecution {
 }
 
 model EvidenceRecord {
-  id            String       @id @default(cuid())
-  evidenceRef   String       @unique
-  type          EvidenceType
-  title         String
-  description   String?
-  fileReference String?
-  addedByUserId String?
-  addedByUser   User?        @relation("EvidenceAddedByUser", fields: [addedByUserId], references: [id])
-  capturedAt    DateTime     @default(now())
-  createdAt     DateTime     @default(now())
+  id              String                   @id @default(cuid())
+  evidenceRef     String                   @unique
+  type            EvidenceType
+  title           String
+  description     String?
+  fileReference   String?
+  storageProvider EvidenceStorageProvider?
+  storageKey      String?
+  mimeType        String?
+  sizeBytes       Int?
+  addedByUserId   String?
+  addedByUser     User?                    @relation("EvidenceAddedByUser", fields: [addedByUserId], references: [id])
+  capturedAt      DateTime                 @default(now())
+  createdAt       DateTime                 @default(now())
 
   uatExecutionId  String?
   uatExecution    UATExecution?  @relation(fields: [uatExecutionId], references: [id])

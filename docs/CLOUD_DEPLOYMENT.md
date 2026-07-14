@@ -29,6 +29,10 @@ Project → **Settings → Environment Variables**. Vercel lets you scope each v
 | `DEMO_READ_ONLY` | `true` | `true` |
 | `SESSION_SECRET` | a distinct random value (e.g. `openssl rand -base64 32`) | a **different** distinct random value |
 | `SEED_USER_PASSWORD` | the shared demo-login password to seed (step 5) | the shared demo-login password to seed (step 5) |
+| `EVIDENCE_STORAGE_PROVIDER` | `vercel-blob` | `vercel-blob` |
+| `BLOB_READ_WRITE_TOKEN` | auto-provisioned when a Blob store is attached (see below) | auto-provisioned when a Blob store is attached (see below) |
+
+**Evidence file storage:** Project → **Storage → Create Database → Blob** — attaching a Blob store to the project auto-populates `BLOB_READ_WRITE_TOKEN` for you, scoped per environment like everything else here. Without `EVIDENCE_STORAGE_PROVIDER=vercel-blob`, the app would fall back to its local-filesystem adapter, which doesn't work on Vercel's ephemeral, per-request filesystem — evidence file uploads would silently disappear. See `docs/SECURITY_AND_LIMITATIONS.md#evidence-file-storage-cloud-phase-24`.
 
 **`DEMO_READ_ONLY=true` in both.** The public demo rules (no real payment submission, reconciliation execution disabled for anonymous visitors, write workflows safely isolated) are all satisfied by one flag: every mutating Server Action (`lib/demo-mode.ts`, wired into `lib/actions/*.ts`) returns a clear "read-only demo" message instead of touching the database when this is set. Local dev, Vitest and Playwright never set it, so the full interactive workflow stays fully testable — only the public deployment is locked down. This is independent of and composes with the login requirement below (Cloud Phase 2.1) — every visitor, logged in or not, hits the same read-only guard on the public deployment.
 
@@ -57,6 +61,7 @@ Re-running later re-seeds from empty — reset first (`pnpm exec prisma migrate 
 - Open the Preview and Production URLs; confirm you're redirected to `/login`, and that logging in with any seeded user's email + the environment's `SEED_USER_PASSWORD` succeeds and reaches `/dashboard`.
 - Confirm `/dashboard`, `/payments`, `/exceptions`, `/reports` all render seeded data.
 - Confirm the read-only guard: attempt any mutation (e.g. "Run reconciliation") and confirm it returns the "read-only demo" message rather than actually running.
+- Evidence file storage isn't covered by CI (no cloud credentials there): manually attach a small file to an exception's evidence form on the real Preview deployment (with `DEMO_READ_ONLY` temporarily unset, or against a non-public test project) and confirm the resulting "View uploaded file" link resolves to a working Vercel Blob URL.
 - Confirm `/reports/*` exports still work (they're reads, unaffected by `DEMO_READ_ONLY`) and don't expose raw database IDs — every export column uses human-readable reference codes (`caseReference`, `paymentReference`, etc.), never a Prisma `id`.
 
 ## Rollback

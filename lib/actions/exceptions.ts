@@ -15,6 +15,7 @@ import {
 import { formDataToObject, mapWorkflowError, type ActionResult } from "./helpers";
 import { isDemoReadOnly, demoReadOnlyResult } from "@/lib/demo-mode";
 import { requirePermission } from "@/lib/auth/permissions";
+import { uploadEvidenceFileIfPresent } from "@/lib/evidence-storage/upload";
 import * as exceptionWorkflow from "@/lib/exception-workflow/service";
 
 function revalidateExceptionPaths(exceptionId: string) {
@@ -218,6 +219,7 @@ export async function addExceptionEvidenceAction(formData: FormData): Promise<Ac
     const actor = await getActingUser();
     const denial = requirePermission<ActionResult>(actor, "EXCEPTION_EVIDENCE");
     if (denial) return denial;
+    const upload = await uploadEvidenceFileIfPresent(formData);
     await exceptionWorkflow.addEvidenceToException(input.exceptionId, {
       expectedVersion: input.expectedVersion,
       now: new Date(),
@@ -227,6 +229,10 @@ export async function addExceptionEvidenceAction(formData: FormData): Promise<Ac
       title: input.title,
       description: input.description || null,
       fileReference: input.fileReference || null,
+      storageProvider: upload?.provider ?? null,
+      storageKey: upload?.storageKey ?? null,
+      mimeType: upload?.mimeType ?? null,
+      sizeBytes: upload?.sizeBytes ?? null,
       addedByUserId: actor.id,
     });
     revalidateExceptionPaths(input.exceptionId);

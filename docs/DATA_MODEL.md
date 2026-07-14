@@ -25,7 +25,7 @@ See [RECONCILIATION_RULES.md](RECONCILIATION_RULES.md) for what each rule actual
   - `source` defaults to `"MANUAL"` at the column level, but every case actually created by this codebase comes from the reconciliation engine with `source: "SYSTEM"` — `"MANUAL"` exists for schema completeness/future manual-case creation, not because any code path uses it today.
 - **`ExceptionComment`** — despite the name, these are typed investigation notes (`ExceptionNoteType`), not free-form comments; kept from the Sprint 2 schema name rather than renamed, to avoid an unnecessary migration.
 - **`AuditEvent`** — a generic, append-only event log (`entityType` + `entityId`, not a foreign key) shared by both the exception workflow and the UAT workflow, so one model/index serves both rather than two parallel audit tables. `actorUserId` (required, Cloud Phase 2.3) is a real FK to `User`, not a free-text name — a seeded, unloginable service-account user (`system@payguard-ie.internal`) is the fallback for machine-driven events with no real acting user.
-- **`EvidenceRecord`** — nullable foreign keys to *both* `ExceptionCase` and `UATExecution` (never both set on the same row) rather than a polymorphic join table, since there are only ever two possible owners.
+- **`EvidenceRecord`** — nullable foreign keys to *both* `ExceptionCase` and `UATExecution` (never both set on the same row) rather than a polymorphic join table, since there are only ever two possible owners. `fileReference` (a free-text path/URL pointer) coexists with real upload support as of Cloud Phase 2.4: `storageProvider` (`LOCAL`/`VERCEL_BLOB`), `storageKey`, `mimeType`, `sizeBytes` are all nullable, since a row may have a text reference, a real uploaded file, or neither.
 
 ## UAT workspace (Sprint 3)
 

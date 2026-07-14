@@ -2,6 +2,7 @@ import { z } from "zod";
 import { ConcurrencyConflictError } from "@/lib/exception-workflow/persistence";
 import { DomainValidationError, ExceptionNotFoundError } from "@/lib/exception-workflow/service";
 import { InvalidTransitionError } from "@/lib/exception-workflow/stateMachine";
+import { InvalidEvidenceFileError } from "@/lib/validation/evidenceFile";
 
 export interface ActionResult {
   success: boolean;
@@ -27,6 +28,9 @@ export function mapWorkflowError(error: unknown): ActionResult {
     return { success: false, message: error.message };
   }
   if (error instanceof ExceptionNotFoundError) {
+    return { success: false, message: error.message };
+  }
+  if (error instanceof InvalidEvidenceFileError) {
     return { success: false, message: error.message };
   }
   console.error("Exception workflow action failed:", error);

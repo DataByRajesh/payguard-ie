@@ -1,0 +1,2 @@
+Sample evidence file used by tests/e2e/exception-lifecycle.spec.ts to exercise a real file
+upload through the local evidence storage adapter (Cloud Phase 2.4).

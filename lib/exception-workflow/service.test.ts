@@ -1,5 +1,8 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { rm } from "node:fs/promises";
+import path from "node:path";
 import { prisma } from "@/lib/db";
+import { localEvidenceAdapter, LOCAL_EVIDENCE_DIR } from "@/lib/evidence-storage/local-adapter";
 import { ConcurrencyConflictError } from "./persistence";
 import {
   DomainValidationError,
@@ -263,6 +266,10 @@ describe("exception-workflow service (integration)", () => {
       title: "Replacement settlement file confirmation",
       description: null,
       fileReference: null,
+      storageProvider: null,
+      storageKey: null,
+      mimeType: null,
+      sizeBytes: null,
       addedByUserId: analyst.id,
     });
     const closed = await approveException(exceptionCase.id, {
@@ -351,5 +358,45 @@ describe("exception-workflow service (integration)", () => {
 
     expect(reopened.status).toBe("INVESTIGATING");
     expect(reopened.approvalDecision).toBe("REJECTED");
+  });
+
+  describe("evidence with an uploaded file (Cloud Phase 2.4)", () => {
+    const writtenPaths: string[] = [];
+
+    afterEach(async () => {
+      await Promise.all(writtenPaths.splice(0).map((filePath) => rm(filePath, { force: true })));
+    });
+
+    it("stores a real uploaded file's metadata on the evidence record", async () => {
+      const { analyst, exceptionCase } = await createFixture();
+
+      const file = new File(["screenshot bytes"], "confirmation.png", { type: "image/png" });
+      const stored = await localEvidenceAdapter.put(file);
+      writtenPaths.push(path.join(LOCAL_EVIDENCE_DIR, stored.storageKey));
+
+      const { evidence } = await addEvidenceToException(exceptionCase.id, {
+        expectedVersion: exceptionCase.version,
+        now,
+        actorName: analyst.name,
+        actorUserId: analyst.id,
+        evidenceType: "SCREENSHOT",
+        title: "Confirmation screenshot",
+        description: null,
+        fileReference: null,
+        storageProvider: stored.provider,
+        storageKey: stored.storageKey,
+        mimeType: stored.mimeType,
+        sizeBytes: stored.sizeBytes,
+        addedByUserId: analyst.id,
+      });
+
+      expect(evidence.storageProvider).toBe("LOCAL");
+      expect(evidence.storageKey).toBe(stored.storageKey);
+      expect(evidence.mimeType).toBe("image/png");
+      expect(evidence.sizeBytes).toBe("screenshot bytes".length);
+
+      const persisted = await prisma.evidenceRecord.findUniqueOrThrow({ where: { id: evidence.id } });
+      expect(persisted.storageKey).toBe(stored.storageKey);
+    });
   });
 });

@@ -60,6 +60,10 @@ export async function addUatEvidence(params: {
   title: string;
   description: string | null;
   fileReference: string | null;
+  storageProvider: string | null;
+  storageKey: string | null;
+  mimeType: string | null;
+  sizeBytes: number | null;
   addedByUserId: string;
   actorName: string;
   now: Date;
@@ -81,6 +85,10 @@ export async function addUatEvidence(params: {
         title: params.title,
         description: params.description,
         fileReference: params.fileReference,
+        storageProvider: params.storageProvider as never,
+        storageKey: params.storageKey,
+        mimeType: params.mimeType,
+        sizeBytes: params.sizeBytes,
         addedByUserId: params.addedByUserId,
         capturedAt: params.now,
         createdAt: params.now,
