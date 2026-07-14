@@ -21,6 +21,7 @@
     "db:reset": "prisma migrate reset --force",
     "db:studio": "prisma studio",
     "demo:reset": "tsx scripts/demo-reset.ts",
+    "db:backup": "tsx scripts/db-backup.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
