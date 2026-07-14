@@ -4,5 +4,6 @@ export async function getAuditEventsForEntity(entityType: string, entityId: stri
   return prisma.auditEvent.findMany({
     where: { entityType, entityId },
     orderBy: { createdAt: "asc" },
+    include: { actorUser: true },
   });
 }

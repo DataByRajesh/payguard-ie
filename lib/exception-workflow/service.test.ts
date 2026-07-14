@@ -81,6 +81,7 @@ describe("exception-workflow service (integration)", () => {
       expectedVersion: exceptionCase.version,
       now,
       actorName: analyst.name,
+      actorUserId: analyst.id,
       assignToUserId: analyst.id,
       assigneeName: analyst.name,
       assignedByUserId: analyst.id,
@@ -103,6 +104,7 @@ describe("exception-workflow service (integration)", () => {
       expectedVersion: exceptionCase.version,
       now,
       actorName: analyst.name,
+      actorUserId: analyst.id,
       assignToUserId: analyst.id,
       assigneeName: analyst.name,
       assignedByUserId: analyst.id,
@@ -112,7 +114,7 @@ describe("exception-workflow service (integration)", () => {
     // Re-using the original (now stale) version simulates two people acting on the same
     // page load — the second mutation must be rejected rather than silently overwriting.
     await expect(
-      startInvestigation(exceptionCase.id, { expectedVersion: exceptionCase.version, now, actorName: analyst.name }),
+      startInvestigation(exceptionCase.id, { expectedVersion: exceptionCase.version, now, actorName: analyst.name, actorUserId: analyst.id }),
     ).rejects.toThrow(ConcurrencyConflictError);
   });
 
@@ -123,18 +125,20 @@ describe("exception-workflow service (integration)", () => {
       expectedVersion: exceptionCase.version,
       now,
       actorName: analyst.name,
+      actorUserId: analyst.id,
       assignToUserId: analyst.id,
       assigneeName: analyst.name,
       assignedByUserId: analyst.id,
       note: null,
     });
-    const investigating = await startInvestigation(exceptionCase.id, { expectedVersion: assigned.version, now, actorName: analyst.name });
+    const investigating = await startInvestigation(exceptionCase.id, { expectedVersion: assigned.version, now, actorName: analyst.name, actorUserId: analyst.id });
 
     await expect(
       submitResolution(exceptionCase.id, {
         expectedVersion: investigating.version,
         now,
         actorName: analyst.name,
+      actorUserId: analyst.id,
         resolutionAction: "NO_ISSUE_FOUND",
         resolutionSummary: "Attempting to resolve without a root cause.",
         resolutionUserId: analyst.id,
@@ -149,16 +153,18 @@ describe("exception-workflow service (integration)", () => {
       expectedVersion: exceptionCase.version,
       now,
       actorName: analyst.name,
+      actorUserId: analyst.id,
       assignToUserId: analyst.id,
       assigneeName: analyst.name,
       assignedByUserId: analyst.id,
       note: null,
     });
-    current = await startInvestigation(exceptionCase.id, { expectedVersion: current.version, now, actorName: analyst.name });
+    current = await startInvestigation(exceptionCase.id, { expectedVersion: current.version, now, actorName: analyst.name, actorUserId: analyst.id });
     current = await recordRootCause(exceptionCase.id, {
       expectedVersion: current.version,
       now,
       actorName: analyst.name,
+      actorUserId: analyst.id,
       rootCauseCategory: "UNKNOWN",
       rootCauseSummary: "Root cause identified for this test fixture.",
       identifiedByUserId: analyst.id,
@@ -167,13 +173,14 @@ describe("exception-workflow service (integration)", () => {
       expectedVersion: current.version,
       now,
       actorName: analyst.name,
+      actorUserId: analyst.id,
       resolutionAction: "NO_ISSUE_FOUND",
       resolutionSummary: "No corrective action was required.",
       resolutionUserId: analyst.id,
     });
 
     await expect(
-      approveException(exceptionCase.id, { expectedVersion: current.version, now, actorName: analyst.name, approverUserId: analyst.id, approvalNote: null }),
+      approveException(exceptionCase.id, { expectedVersion: current.version, now, actorName: analyst.name, actorUserId: analyst.id, approverUserId: analyst.id, approvalNote: null }),
     ).rejects.toThrow(DomainValidationError);
   });
 
@@ -184,16 +191,18 @@ describe("exception-workflow service (integration)", () => {
       expectedVersion: exceptionCase.version,
       now,
       actorName: analyst.name,
+      actorUserId: analyst.id,
       assignToUserId: analyst.id,
       assigneeName: analyst.name,
       assignedByUserId: analyst.id,
       note: null,
     });
-    current = await startInvestigation(exceptionCase.id, { expectedVersion: current.version, now, actorName: analyst.name });
+    current = await startInvestigation(exceptionCase.id, { expectedVersion: current.version, now, actorName: analyst.name, actorUserId: analyst.id });
     current = await recordRootCause(exceptionCase.id, {
       expectedVersion: current.version,
       now,
       actorName: analyst.name,
+      actorUserId: analyst.id,
       rootCauseCategory: "UNKNOWN",
       rootCauseSummary: "Root cause identified for this test fixture.",
       identifiedByUserId: analyst.id,
@@ -202,13 +211,14 @@ describe("exception-workflow service (integration)", () => {
       expectedVersion: current.version,
       now,
       actorName: analyst.name,
+      actorUserId: analyst.id,
       resolutionAction: "NO_ISSUE_FOUND",
       resolutionSummary: "No corrective action was required.",
       resolutionUserId: analyst.id,
     });
 
     await expect(
-      approveException(exceptionCase.id, { expectedVersion: current.version, now, actorName: approver.name, approverUserId: approver.id, approvalNote: null }),
+      approveException(exceptionCase.id, { expectedVersion: current.version, now, actorName: approver.name, actorUserId: approver.id, approverUserId: approver.id, approvalNote: null }),
     ).rejects.toThrow(DomainValidationError);
   });
 
@@ -219,16 +229,18 @@ describe("exception-workflow service (integration)", () => {
       expectedVersion: exceptionCase.version,
       now,
       actorName: analyst.name,
+      actorUserId: analyst.id,
       assignToUserId: analyst.id,
       assigneeName: analyst.name,
       assignedByUserId: analyst.id,
       note: null,
     });
-    current = await startInvestigation(exceptionCase.id, { expectedVersion: current.version, now, actorName: analyst.name });
+    current = await startInvestigation(exceptionCase.id, { expectedVersion: current.version, now, actorName: analyst.name, actorUserId: analyst.id });
     current = await recordRootCause(exceptionCase.id, {
       expectedVersion: current.version,
       now,
       actorName: analyst.name,
+      actorUserId: analyst.id,
       rootCauseCategory: "SETTLEMENT_FILE_MISSING",
       rootCauseSummary: "The settlement file for this batch never arrived from the provider.",
       identifiedByUserId: analyst.id,
@@ -237,6 +249,7 @@ describe("exception-workflow service (integration)", () => {
       expectedVersion: current.version,
       now,
       actorName: analyst.name,
+      actorUserId: analyst.id,
       resolutionAction: "CORRECTIVE_SETTLEMENT_APPLIED",
       resolutionSummary: "Requested and applied a replacement settlement file from the provider.",
       resolutionUserId: analyst.id,
@@ -245,6 +258,7 @@ describe("exception-workflow service (integration)", () => {
       expectedVersion: current.version,
       now,
       actorName: analyst.name,
+      actorUserId: analyst.id,
       evidenceType: "QUERY_RESULT",
       title: "Replacement settlement file confirmation",
       description: null,
@@ -255,6 +269,7 @@ describe("exception-workflow service (integration)", () => {
       expectedVersion: withEvidence.exceptionCase.version,
       now,
       actorName: approver.name,
+      actorUserId: approver.id,
       approverUserId: approver.id,
       approvalNote: "Confirmed the replacement file resolves the discrepancy.",
     });
@@ -275,6 +290,17 @@ describe("exception-workflow service (integration)", () => {
       "EVIDENCE_ADDED",
       "EXCEPTION_APPROVED",
     ]);
+    // Cloud Phase 2.3: every audit event is linked to a real User via actorUserId, not a
+    // free-text name -- the last event (the approval) is attributed to the approver, everything
+    // before it to the analyst who did the rest of the work.
+    expect(events.map((event) => event.actorUserId)).toEqual([
+      analyst.id,
+      analyst.id,
+      analyst.id,
+      analyst.id,
+      analyst.id,
+      approver.id,
+    ]);
   });
 
   it("rejects a resolution and reopens the case for further investigation", async () => {
@@ -284,20 +310,22 @@ describe("exception-workflow service (integration)", () => {
       expectedVersion: exceptionCase.version,
       now,
       actorName: analyst.name,
+      actorUserId: analyst.id,
       assignToUserId: analyst.id,
       assigneeName: analyst.name,
       assignedByUserId: analyst.id,
       note: null,
     });
-    current = await startInvestigation(exceptionCase.id, { expectedVersion: current.version, now, actorName: analyst.name });
-    current = await requestInformation(exceptionCase.id, { expectedVersion: current.version, now, actorName: analyst.name });
+    current = await startInvestigation(exceptionCase.id, { expectedVersion: current.version, now, actorName: analyst.name, actorUserId: analyst.id });
+    current = await requestInformation(exceptionCase.id, { expectedVersion: current.version, now, actorName: analyst.name, actorUserId: analyst.id });
     expect(current.status).toBe("AWAITING_INFORMATION");
 
-    current = await resumeInvestigation(exceptionCase.id, { expectedVersion: current.version, now, actorName: analyst.name });
+    current = await resumeInvestigation(exceptionCase.id, { expectedVersion: current.version, now, actorName: analyst.name, actorUserId: analyst.id });
     current = await recordRootCause(exceptionCase.id, {
       expectedVersion: current.version,
       now,
       actorName: analyst.name,
+      actorUserId: analyst.id,
       rootCauseCategory: "UNKNOWN",
       rootCauseSummary: "Root cause identified while awaiting information.",
       identifiedByUserId: analyst.id,
@@ -306,6 +334,7 @@ describe("exception-workflow service (integration)", () => {
       expectedVersion: current.version,
       now,
       actorName: analyst.name,
+      actorUserId: analyst.id,
       resolutionAction: "NO_ISSUE_FOUND",
       resolutionSummary: "No corrective action was required.",
       resolutionUserId: analyst.id,
@@ -315,6 +344,7 @@ describe("exception-workflow service (integration)", () => {
       expectedVersion: current.version,
       now,
       actorName: approver.name,
+      actorUserId: approver.id,
       approverUserId: approver.id,
       approvalNote: "Please gather more evidence before resolving.",
     });

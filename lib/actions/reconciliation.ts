@@ -24,7 +24,7 @@ export async function runReconciliationAction(): Promise<RunReconciliationAction
   if (denial) return denial;
 
   try {
-    const result = await runReconciliation();
+    const result = await runReconciliation(actor.id);
     revalidatePath("/reconciliation");
     revalidatePath("/exceptions");
 

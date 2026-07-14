@@ -22,7 +22,7 @@ export class ReconciliationAlreadyRunningError extends Error {
  * rule against every payment, persists results and idempotent exceptions, and marks the
  * run completed (or failed). Never touches Prisma directly — only through persistence.ts.
  */
-export async function runReconciliation(now: Date = new Date()): Promise<ReconciliationRunResult> {
+export async function runReconciliation(actorUserId: string, now: Date = new Date()): Promise<ReconciliationRunResult> {
   const started = await startRun(now);
   if (started.status === "ALREADY_RUNNING") {
     throw new ReconciliationAlreadyRunningError();
@@ -39,7 +39,7 @@ export async function runReconciliation(now: Date = new Date()): Promise<Reconci
       evaluations.push(...evaluateAllRules({ payment, settlement, allPayments, now }));
     }
 
-    const exceptionsCreated = await persistResults(run.id, evaluations, now);
+    const exceptionsCreated = await persistResults(run.id, evaluations, now, actorUserId);
     const completedAt = new Date();
 
     const summary = buildRunSummary({

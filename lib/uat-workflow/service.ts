@@ -7,8 +7,8 @@ export class UatTestCaseNotFoundError extends Error {
   }
 }
 
-async function createAuditEvent(entityId: string, action: string, summary: string, actor: string, createdAt: Date) {
-  await prisma.auditEvent.create({ data: { entityType: "UAT_EXECUTION", entityId, action, summary, actor, createdAt } });
+async function createAuditEvent(entityId: string, action: string, summary: string, actorUserId: string, createdAt: Date) {
+  await prisma.auditEvent.create({ data: { entityType: "UAT_EXECUTION", entityId, action, summary, actorUserId, createdAt } });
 }
 
 /**
@@ -47,7 +47,7 @@ export async function executeUatCase(params: {
     execution.id,
     "UAT_EXECUTED",
     `${params.testerName} executed ${testCase.testCaseRef} with result ${params.status}.`,
-    params.testerName,
+    params.testerUserId,
     params.now,
   );
 
@@ -88,7 +88,7 @@ export async function addUatEvidence(params: {
     });
   });
 
-  await createAuditEvent(params.executionId, "UAT_EVIDENCE_ADDED", `${params.actorName} added evidence (${evidence.evidenceRef}).`, params.actorName, params.now);
+  await createAuditEvent(params.executionId, "UAT_EVIDENCE_ADDED", `${params.actorName} added evidence (${evidence.evidenceRef}).`, params.addedByUserId, params.now);
 
   return evidence;
 }
