@@ -1,4 +1,5 @@
 import { test, expect, type Locator, type Page } from "@playwright/test";
+import { loginAsEmail } from "./fixtures/auth";
 
 /** See tests/e2e/exception-lifecycle.spec.ts for why this retry wrapper exists. */
 async function submitAndAwaitStatus(
@@ -24,6 +25,9 @@ async function submitAndAwaitStatus(
 
 test("recording a failed UAT execution, linking it to an exception, and attaching evidence", async ({ page }) => {
   test.setTimeout(120000);
+  // The default logged-in user (auth.setup.ts's storageState) is an OPS_ANALYST, which has no
+  // UAT_EXECUTE/UAT_EVIDENCE permission (lib/auth/permissions.ts) -- log in as a UAT_LEAD instead.
+  await loginAsEmail(page, "niamh.doyle@payguard-ie.example");
   await page.goto("/uat");
   const table = page.getByRole("table", { name: "UAT test cases" });
   await expect(table).toBeVisible({ timeout: 20000 });

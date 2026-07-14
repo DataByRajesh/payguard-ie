@@ -104,7 +104,7 @@ Every mutation writes an `AuditEvent` (`entityType: "EXCEPTION_CASE"`) inside th
 
 ## Known limitations
 
-- No authorization — Cloud Phase 2.1 added real authentication (signed sessions, password login), but every logged-in user can still perform every action; role-based authorization checks land in Cloud Phase 2.2.
+- Role-based authorization (Cloud Phase 2.2, `lib/auth/permissions.ts`) decides which roles may attempt each action, but there's no finer-grained scoping (e.g. by team or region) — every `OPS_ANALYST` can act on every exception case.
 - No email/real-time notifications on assignment, SLA breach or rejection (out of scope per the sprint brief).
 - Evidence is metadata-only; there is no file upload or cloud storage.
 - A single global `dueSoonThresholdHours` and severity-based SLA table apply uniformly; a production system might vary these by exception type or customer segment.

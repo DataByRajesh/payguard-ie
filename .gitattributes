@@ -1,0 +1,9 @@
+# Force LF for all text source files, regardless of platform or local core.autocrlf setting.
+#
+# Without this, Git for Windows' common `core.autocrlf=true` default checks out every text file
+# with CRLF line endings. Playwright's test-file discovery (this project's tests/e2e/*.spec.ts)
+# silently returns zero tests for any CRLF-terminated spec file on this stack -- no error, no
+# warning, just an empty file list -- so a fresh Windows clone would silently run a fraction of
+# the e2e suite. Confirmed by converting a CRLF copy of a spec file to LF and watching Playwright
+# discover its tests again.
+* text=auto eol=lf
