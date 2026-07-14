@@ -32,7 +32,7 @@ export function UatExecutionHistory({ executions }: { executions: ExecutionItem[
               {execution.linkedExceptionCase ? (
                 <p className="mt-2 text-xs">
                   Linked to{" "}
-                  <Link href={`/exceptions/${execution.linkedExceptionCase.id}`} className="font-medium text-slate-800 underline-offset-2 hover:underline">
+                  <Link href={`/exceptions/${execution.linkedExceptionCase.id}`} prefetch={false} className="font-medium text-slate-800 underline-offset-2 hover:underline">
                     {execution.linkedExceptionCase.caseReference}
                   </Link>
                 </p>

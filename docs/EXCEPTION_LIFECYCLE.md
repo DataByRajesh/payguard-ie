@@ -2,7 +2,7 @@
 
 This document describes the Sprint 3 investigation, resolution and approval workflow for exception cases (`lib/exception-workflow/`), which sits on top of the Sprint 2 reconciliation engine that creates exceptions in the first place (see [RECONCILIATION_RULES.md](RECONCILIATION_RULES.md)).
 
-There is no authentication in this project. Every mutation is attributed to whichever seeded demo user is currently selected in the "Acting as" selector in the app header (`components/layout/ActingUserSelector.tsx`, cookie-backed via `lib/acting-user.ts`) — this stands in for a logged-in user throughout the workflow described below.
+Every mutation is attributed to whoever is currently logged in (Cloud Phase 2.1 — signed session cookie via `lib/auth/session.ts`, looked up in `lib/acting-user.ts`) throughout the workflow described below.
 
 ## Status state machine
 
@@ -65,7 +65,7 @@ On success the case moves to `RESOLVED` with a resolution action from a fixed li
 
 ## Approval and closure
 
-A `RESOLVED` case requires independent review before it can close — `assessReviewerSeparation()` (`lib/exception-workflow/approval.ts`), shared by both approval paths, rejects the review if the reviewer is the same user who submitted the resolution (`DomainValidationError`, surfaced in the UI as *"Switch the acting-user selector to a different demo user"*).
+A `RESOLVED` case requires independent review before it can close — `assessReviewerSeparation()` (`lib/exception-workflow/approval.ts`), shared by both approval paths, rejects the review if the reviewer is the same user who submitted the resolution (`DomainValidationError`, surfaced in the UI as *"Log in as a different demo user to approve or reject it"*).
 
 - **Approve** (`approveException()`) additionally requires **at least one evidence record** attached to the case — closure without any supporting evidence is blocked. On success: `status: CLOSED`, `approvalDecision: APPROVED`, `closedAt` set (this is what the SLA calculation below uses to decide on-time vs. late).
 - **Reject** (`rejectException()`) has no evidence requirement (nothing is being closed) and returns the case to `INVESTIGATING` with `approvalDecision: REJECTED`, so the resolver can revise the root cause or resolution and resubmit.
@@ -104,7 +104,7 @@ Every mutation writes an `AuditEvent` (`entityType: "EXCEPTION_CASE"`) inside th
 
 ## Known limitations
 
-- No authentication — the acting-user selector is an explicit stand-in, not a security boundary; anyone with access to the app can act as any seeded user.
+- No authorization — Cloud Phase 2.1 added real authentication (signed sessions, password login), but every logged-in user can still perform every action; role-based authorization checks land in Cloud Phase 2.2.
 - No email/real-time notifications on assignment, SLA breach or rejection (out of scope per the sprint brief).
 - Evidence is metadata-only; there is no file upload or cloud storage.
 - A single global `dueSoonThresholdHours` and severity-based SLA table apply uniformly; a production system might vary these by exception type or customer segment.

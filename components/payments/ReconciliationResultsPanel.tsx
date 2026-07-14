@@ -32,6 +32,7 @@ export function ReconciliationResultsPanel({ results }: { results: Reconciliatio
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <Link
                   href={`/reconciliation/${result.reconciliationRun.id}`}
+                  prefetch={false}
                   className="text-sm font-medium text-slate-800 underline-offset-2 hover:underline"
                 >
                   {result.reconciliationRun.runReference}
@@ -47,6 +48,7 @@ export function ReconciliationResultsPanel({ results }: { results: Reconciliatio
               {result.exceptionCaseId ? (
                 <Link
                   href={`/exceptions/${result.exceptionCaseId}`}
+                  prefetch={false}
                   className="text-xs font-medium text-slate-500 underline-offset-2 hover:underline"
                 >
                   View linked exception

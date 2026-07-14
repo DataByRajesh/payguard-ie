@@ -25,6 +25,7 @@ export function SettlementsTable({ settlements, hasActiveFilters }: SettlementsT
       render: (settlement) => (
         <Link
           href={`/payments/${settlement.paymentId}`}
+          prefetch={false}
           className="text-slate-700 underline-offset-2 hover:underline"
         >
           {settlement.payment.paymentReference}

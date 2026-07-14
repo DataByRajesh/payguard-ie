@@ -69,7 +69,7 @@ export function ApprovalCard({
         {canReview ? (
           isSelfReview ? (
             <p className="text-xs text-amber-700">
-              This case was resolved by the current acting user. Switch the acting-user selector to a different demo user to approve or reject it.
+              This case was resolved by the currently signed-in user. Log in as a different demo user to approve or reject it.
             </p>
           ) : (
             <form ref={formRef} onSubmit={(event) => event.preventDefault()} className="flex flex-col gap-2 border-t border-slate-100 pt-3">

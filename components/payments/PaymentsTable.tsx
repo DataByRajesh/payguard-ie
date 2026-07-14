@@ -19,7 +19,7 @@ export function PaymentsTable({ payments, hasActiveFilters }: PaymentsTableProps
       key: "reference",
       header: "Payment reference",
       render: (payment) => (
-        <Link href={`/payments/${payment.id}`} className="font-medium text-slate-900 underline-offset-2 hover:underline">
+        <Link href={`/payments/${payment.id}`} prefetch={false} className="font-medium text-slate-900 underline-offset-2 hover:underline">
           {payment.paymentReference}
         </Link>
       ),

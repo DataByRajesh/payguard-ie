@@ -10,7 +10,7 @@ A `UATExecution` is a single recorded run of a test case against the application
 
 - **Status** — one of four (`UAT_STATUSES`): `NOT_RUN`, `PASS`, `FAIL`, `BLOCKED`. Note the exact vocabulary is `PASS`/`FAIL`, not `PASSED`/`FAILED`.
 - **Actual result** and **notes** — free text; notes are the natural place to record *why* an execution is `BLOCKED` (e.g. an environment issue unrelated to the feature under test).
-- **Tester** — attributed to the current acting user (`lib/acting-user.ts`), the same cookie-based demo-identity mechanism used throughout the app; there is no real authentication.
+- **Tester** — attributed to the currently logged-in user (`lib/acting-user.ts`, Cloud Phase 2.1 signed-session identity), the same mechanism used throughout the app.
 - A test case can be executed any number of times — `/uat/[id]` shows the full execution history for a test case, most recent first, not just the latest result.
 
 ## Manual-only exception linking — the one rule that matters most in this doc
@@ -47,6 +47,6 @@ Every execution and every evidence attachment writes an `AuditEvent` (`entityTyp
 
 ## Known limitations
 
-- No authentication — same acting-user stand-in as the rest of the app.
+- No authorization — same as the rest of the app; every logged-in user can execute every test case until Cloud Phase 2.2's role-based authorization lands.
 - No cycle/release grouping — executions are a flat history per test case, not organised into named test cycles or release sign-offs (out of scope this sprint).
 - No coverage reporting linking test cases to specific application features beyond the free-text `area` field.

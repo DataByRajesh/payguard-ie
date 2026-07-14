@@ -37,7 +37,7 @@ export function TriggeringResultCard({ result }: TriggeringResultCardProps) {
       ) : (
         <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <Field label="Run">
-            <Link href={`/reconciliation/${result.reconciliationRun.id}`} className="underline-offset-2 hover:underline">
+            <Link href={`/reconciliation/${result.reconciliationRun.id}`} prefetch={false} className="underline-offset-2 hover:underline">
               {result.reconciliationRun.runReference}
             </Link>
           </Field>
