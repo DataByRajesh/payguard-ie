@@ -16,9 +16,11 @@ There is real login: `proxy.ts` redirects any request without a valid session co
 
 There is no message queue, no background jobs/cron, no outbound HTTP calls, no file storage service, no multi-tenancy, and no connection to any real bank, card scheme, or payment processor. Every `Payment`/`Settlement` row is synthetic seed data ([DATA_MODEL.md](DATA_MODEL.md)) — the "settlement file" concept referenced by the reconciliation engine's `sourceFileReference` field is a label on a seeded row, not an actual file ingested from anywhere.
 
-## Evidence is metadata-only
+## Evidence file storage (Cloud Phase 2.4)
 
-`EvidenceRecord` ([DATA_MODEL.md](DATA_MODEL.md)) stores a type, title, description, and an optional free-text `fileReference` — never a file. There is no upload endpoint and no cloud storage integration anywhere in this project. In a real system, evidence attached to an exception case or UAT execution (screenshots, log extracts, sign-off documents) would need actual file storage with its own access controls; here it's a pointer describing where such an artifact *would* live.
+`EvidenceRecord` ([DATA_MODEL.md](DATA_MODEL.md)) can now hold a real uploaded file, not just a free-text `fileReference` pointer — `lib/evidence-storage/` provides two adapters selected by `EVIDENCE_STORAGE_PROVIDER`: `local` (default; writes to a gitignored `.data/evidence/` directory, served back through `app/evidence/[...path]/route.ts`, itself behind `proxy.ts`'s session check like every other route) and `vercel-blob` (the public Preview/Production demo; `@vercel/blob`, whose URLs are already public HTTPS). Uploads are capped at 10MB and restricted to an explicit MIME allow-list (`lib/validation/evidenceFile.ts`) — anything else is rejected with a clear message before it reaches storage.
+
+**What this doesn't add:** access control on the file itself. The local route only serves files already registered as an `EvidenceRecord.storageKey` (not arbitrary paths), and requires a valid session like everything else, but any logged-in user can view any evidence file's URL — there's no per-file ownership or role check beyond the existing `EXCEPTION_EVIDENCE`/`UAT_EVIDENCE` permission on *adding* evidence (Cloud Phase 2.2). Vercel Blob URLs are public-by-design once issued (`access: "public"`) — anyone with the URL can view the file, whether or not they're logged into this app; this is an explicit, standard trade-off for Blob's simplicity, acceptable here since every uploaded file is synthetic demo data.
 
 ## Reports export whatever is in the database, to any logged-in user
 

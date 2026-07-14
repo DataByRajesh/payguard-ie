@@ -23,7 +23,7 @@ The dropdown offers every non-`CLOSED` exception case (`getLinkableExceptionCase
 
 ## Evidence
 
-Like exception cases, UAT executions can have evidence records attached (`addUatEvidence()`) — the same `EvidenceRecord` model, same five types, same metadata-only (no file upload) constraint described in [EXCEPTION_LIFECYCLE.md](EXCEPTION_LIFECYCLE.md#evidence). A screenshot of the actual (failing) behaviour, a log extract, or a query result confirming the expected data state are the intended use.
+Like exception cases, UAT executions can have evidence records attached (`addUatEvidence()`) — the same `EvidenceRecord` model, same five types, same real file upload support described in [EXCEPTION_LIFECYCLE.md](EXCEPTION_LIFECYCLE.md#evidence). A screenshot of the actual (failing) behaviour, a log extract, or a query result confirming the expected data state are the intended use.
 
 ## Release recommendation
 

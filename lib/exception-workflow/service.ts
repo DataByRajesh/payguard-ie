@@ -277,6 +277,10 @@ export async function addEvidenceToException(
     title: string;
     description: string | null;
     fileReference: string | null;
+    storageProvider: string | null;
+    storageKey: string | null;
+    mimeType: string | null;
+    sizeBytes: number | null;
     addedByUserId: string;
   },
 ) {
@@ -290,6 +294,10 @@ export async function addEvidenceToException(
       title: params.title,
       description: params.description,
       fileReference: params.fileReference,
+      storageProvider: params.storageProvider,
+      storageKey: params.storageKey,
+      mimeType: params.mimeType,
+      sizeBytes: params.sizeBytes,
       addedByUserId: params.addedByUserId,
       createdAt: params.now,
     });

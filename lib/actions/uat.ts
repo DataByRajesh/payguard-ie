@@ -7,6 +7,7 @@ import { executeUatCase, addUatEvidence } from "@/lib/uat-workflow/service";
 import { formDataToObject, mapWorkflowError, type ActionResult } from "./helpers";
 import { isDemoReadOnly, demoReadOnlyResult } from "@/lib/demo-mode";
 import { requirePermission } from "@/lib/auth/permissions";
+import { uploadEvidenceFileIfPresent } from "@/lib/evidence-storage/upload";
 
 export async function executeUatCaseAction(formData: FormData): Promise<ActionResult> {
   if (isDemoReadOnly()) return demoReadOnlyResult();
@@ -46,12 +47,17 @@ export async function addUatEvidenceAction(formData: FormData): Promise<ActionRe
     const denial = requirePermission<ActionResult>(actor, "UAT_EVIDENCE");
     if (denial) return denial;
 
+    const upload = await uploadEvidenceFileIfPresent(formData);
     await addUatEvidence({
       executionId: input.executionId,
       evidenceType: input.evidenceType,
       title: input.title,
       description: input.description || null,
       fileReference: input.fileReference || null,
+      storageProvider: upload?.provider ?? null,
+      storageKey: upload?.storageKey ?? null,
+      mimeType: upload?.mimeType ?? null,
+      sizeBytes: upload?.sizeBytes ?? null,
       addedByUserId: actor.id,
       actorName: actor.name,
       now: new Date(),

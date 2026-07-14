@@ -4,6 +4,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { UatStatusBadge } from "@/components/badges";
 import { UatEvidenceForm } from "@/components/uat/UatEvidenceForm";
 import { formatDateTime } from "@/lib/format";
+import { getEvidenceFileUrl } from "@/lib/evidence-storage/types";
 import type { EvidenceRecord, ExceptionCase, UATExecution, User } from "@/app/generated/prisma/client";
 
 interface ExecutionItem extends UATExecution {
@@ -44,6 +45,15 @@ export function UatExecutionHistory({ executions }: { executions: ExecutionItem[
                     <li key={evidence.id} className="text-xs text-slate-600">
                       <span className="font-medium text-slate-700">{evidence.evidenceRef}</span> — {evidence.title}
                       {evidence.fileReference ? ` (${evidence.fileReference})` : ""}
+                      {getEvidenceFileUrl(evidence) ? (
+                        <>
+                          {" "}
+                          ·{" "}
+                          <a href={getEvidenceFileUrl(evidence)!} target="_blank" rel="noreferrer" className="underline-offset-2 hover:underline">
+                            View file
+                          </a>
+                        </>
+                      ) : null}
                     </li>
                   ))}
                 </ul>

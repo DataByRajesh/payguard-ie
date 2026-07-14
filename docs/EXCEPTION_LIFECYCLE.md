@@ -88,7 +88,7 @@ Five states (`SLA_STATES`):
 
 ## Evidence
 
-Append-only evidence metadata records (`EvidenceRecord`) attachable to an exception case at any point via `addEvidenceToException()`: a type (`EVIDENCE_TYPES`: `SCREENSHOT`, `LOG_EXTRACT`, `QUERY_RESULT`, `SIGN_OFF_DOCUMENT`, `OTHER`), a title, an optional description, and an optional `fileReference` (a plain string — a path, URL or internal reference). **There is no cloud storage or file upload in this project** — evidence is a metadata record pointing at where the real artifact lives, not the artifact itself, per the sprint's explicit scope boundary.
+Append-only evidence records (`EvidenceRecord`) attachable to an exception case at any point via `addEvidenceToException()`: a type (`EVIDENCE_TYPES`: `SCREENSHOT`, `LOG_EXTRACT`, `QUERY_RESULT`, `SIGN_OFF_DOCUMENT`, `OTHER`), a title, an optional description, and either (or neither) an optional `fileReference` (a plain string — a path, URL or internal reference) or a real uploaded file. **Cloud Phase 2.4** added actual file storage (`lib/evidence-storage/`, 10MB cap, MIME allow-list) — see [SECURITY_AND_LIMITATIONS.md#evidence-file-storage-cloud-phase-24](SECURITY_AND_LIMITATIONS.md#evidence-file-storage-cloud-phase-24) for the storage adapters and their trade-offs.
 
 ## Optimistic concurrency
 

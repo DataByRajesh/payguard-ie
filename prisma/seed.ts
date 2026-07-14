@@ -447,7 +447,7 @@ async function main() {
     await startInvestigation(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(2, now), actorName: resolver.name, actorUserId: resolver.id });
     await recordRootCause(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(4, now), actorName: resolver.name, actorUserId: resolver.id, rootCauseCategory: "CURRENCY_CONFIGURATION", rootCauseSummary: "FX conversion step used a stale rate table for this settlement batch.", identifiedByUserId: resolver.id });
     await submitResolution(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(6, now), actorName: resolver.name, actorUserId: resolver.id, resolutionAction: "CORRECTIVE_SETTLEMENT_APPLIED", resolutionSummary: "Rate table refreshed and a corrective settlement entry applied to match the payment amount.", resolutionUserId: resolver.id });
-    await addEvidenceToException(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(6, now), actorName: resolver.name, actorUserId: resolver.id, evidenceType: "QUERY_RESULT", title: "Corrective settlement query result", description: "Query confirming the corrective settlement entry matches the payment amount.", fileReference: null, addedByUserId: resolver.id });
+    await addEvidenceToException(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(6, now), actorName: resolver.name, actorUserId: resolver.id, evidenceType: "QUERY_RESULT", title: "Corrective settlement query result", description: "Query confirming the corrective settlement entry matches the payment amount.", fileReference: null, storageProvider: null, storageKey: null, mimeType: null, sizeBytes: null, addedByUserId: resolver.id });
     await approveException(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(8, now), actorName: approver.name, actorUserId: approver.id, approverUserId: approver.id, approvalNote: "Confirmed the corrective entry — closing." });
   }
 
@@ -460,7 +460,7 @@ async function main() {
     await startInvestigation(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: hoursFromNow(2, now), actorName: resolver.name, actorUserId: resolver.id });
     await recordRootCause(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: daysFromNow(2, now), actorName: resolver.name, actorUserId: resolver.id, rootCauseCategory: "MANUAL_PROCESSING_ERROR", rootCauseSummary: "Manual settlement entry was keyed with a transposed digit in the amount field.", identifiedByUserId: resolver.id });
     await submitResolution(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: daysFromNow(3, now), actorName: resolver.name, actorUserId: resolver.id, resolutionAction: "CORRECTIVE_SETTLEMENT_APPLIED", resolutionSummary: "Corrected the keyed amount and re-applied the settlement entry.", resolutionUserId: resolver.id });
-    await addEvidenceToException(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: daysFromNow(3, now), actorName: resolver.name, actorUserId: resolver.id, evidenceType: "SCREENSHOT", title: "Corrected entry screenshot", description: "Screenshot of the corrected manual entry.", fileReference: "/evidence/amount-mismatch-corrected.png", addedByUserId: resolver.id });
+    await addEvidenceToException(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: daysFromNow(3, now), actorName: resolver.name, actorUserId: resolver.id, evidenceType: "SCREENSHOT", title: "Corrected entry screenshot", description: "Screenshot of the corrected manual entry.", fileReference: "/evidence/amount-mismatch-corrected.png", storageProvider: null, storageKey: null, mimeType: null, sizeBytes: null, addedByUserId: resolver.id });
     // Approved well past the exception's SLA deadline (max 7 days for LOW severity) to guarantee "closed late".
     await approveException(exceptionCase.id, { expectedVersion: await versionOf(exceptionCase.id), now: daysFromNow(10, now), actorName: approver.name, actorUserId: approver.id, approverUserId: approver.id, approvalNote: "Apologies for the delay reviewing — confirmed correct, closing." });
   }
@@ -567,6 +567,10 @@ async function main() {
         title: `${testCase.testCaseRef} execution evidence`,
         description: `Captured evidence for the ${status} execution of ${testCase.testCaseRef}.`,
         fileReference: `/evidence/${testCase.testCaseRef.toLowerCase()}-${status.toLowerCase()}.png`,
+        storageProvider: null,
+        storageKey: null,
+        mimeType: null,
+        sizeBytes: null,
         addedByUserId: tester.id,
         actorName: tester.name,
         now: execution.executedAt ?? now,

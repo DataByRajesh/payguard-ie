@@ -80,6 +80,10 @@ export async function createExceptionEvidence(
     title: string;
     description: string | null;
     fileReference: string | null;
+    storageProvider: string | null;
+    storageKey: string | null;
+    mimeType: string | null;
+    sizeBytes: number | null;
     addedByUserId: string;
     createdAt: Date;
   },
@@ -94,6 +98,10 @@ export async function createExceptionEvidence(
       title: params.title,
       description: params.description,
       fileReference: params.fileReference,
+      storageProvider: params.storageProvider as never,
+      storageKey: params.storageKey,
+      mimeType: params.mimeType,
+      sizeBytes: params.sizeBytes,
       addedByUserId: params.addedByUserId,
       capturedAt: params.createdAt,
       createdAt: params.createdAt,

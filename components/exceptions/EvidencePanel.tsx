@@ -7,6 +7,7 @@ import { useWorkflowActionState } from "@/lib/hooks/useWorkflowActionState";
 import { addExceptionEvidenceAction } from "@/lib/actions/exceptions";
 import { formatDateTime } from "@/lib/format";
 import { EVIDENCE_TYPES } from "@/lib/exception-workflow/types";
+import { getEvidenceFileUrl } from "@/lib/evidence-storage/types";
 import type { EvidenceRecord, User } from "@/app/generated/prisma/client";
 
 interface EvidenceItem extends EvidenceRecord {
@@ -35,6 +36,13 @@ export function EvidencePanel({ exceptionId, version, evidenceRecords }: { excep
                 </div>
                 {evidence.description ? <p className="mt-1 text-slate-600">{evidence.description}</p> : null}
                 {evidence.fileReference ? <p className="mt-1 text-xs text-slate-400">{evidence.fileReference}</p> : null}
+                {getEvidenceFileUrl(evidence) ? (
+                  <p className="mt-1 text-xs">
+                    <a href={getEvidenceFileUrl(evidence)!} target="_blank" rel="noreferrer" className="text-slate-600 underline-offset-2 hover:underline">
+                      View uploaded file
+                    </a>
+                  </p>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -74,6 +82,18 @@ export function EvidencePanel({ exceptionId, version, evidenceRecords }: { excep
             placeholder="Reference / URL / internal path (optional)"
             className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
           />
+          <div className="flex flex-col gap-1">
+            <label htmlFor="file" className="text-xs font-medium text-slate-600">
+              Attach a file (optional, max 10MB)
+            </label>
+            <input
+              id="file"
+              name="file"
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain,text/csv,application/json"
+              className="w-full text-sm text-slate-600"
+            />
+          </div>
           <textarea
             name="description"
             rows={2}

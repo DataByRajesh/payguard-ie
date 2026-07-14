@@ -52,3 +52,6 @@ next-env.d.ts
 /blob-report
 /playwright/.cache
 /playwright/.auth
+
+# local evidence file storage (Cloud Phase 2.4) -- dev/CI only, never the public demo
+/.data
