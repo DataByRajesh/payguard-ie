@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: payguard
+          POSTGRES_PASSWORD: payguard
+          POSTGRES_DB: payguard_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U payguard -d payguard_dev"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://payguard:payguard@localhost:5432/payguard_dev
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Create test databases
+        run: |
+          PGPASSWORD=payguard psql -h localhost -U payguard -d postgres -c "CREATE DATABASE payguard_vitest OWNER payguard;"
+          PGPASSWORD=payguard psql -h localhost -U payguard -d postgres -c "CREATE DATABASE payguard_test OWNER payguard;"
+
+      - name: Prisma validate
+        run: pnpm exec prisma validate
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit / integration tests
+        run: pnpm test
+
+      - name: Apply migrations for build
+        run: pnpm exec prisma migrate deploy
+
+      - name: Build
+        run: pnpm build
